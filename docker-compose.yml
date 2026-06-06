@@ -6,12 +6,12 @@ services:
     container_name: fileshift-mysql
     restart: unless-stopped
     ports:
-      - '3306:3306'
+      - '127.0.0.1:3306:3306'
     environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_DATABASE: fileshift
-      MYSQL_USER: fileshift
-      MYSQL_PASSWORD: fileshift123
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
     command: --default-authentication-plugin=caching_sha2_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
@@ -26,12 +26,12 @@ services:
     container_name: fileshift-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
