@@ -51,8 +51,12 @@ export class UserService {
     return {
       id: Number(user.id),
       email: user.email,
+      phone: user.phone,
       nickname: user.nickname,
       avatarUrl: user.avatarUrl,
+      role: user.role,
+      inviteCode: user.inviteCode,
+      createdAt: user.createdAt.toISOString(),
     };
   }
 
