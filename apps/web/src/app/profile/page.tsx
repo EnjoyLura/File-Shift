@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getProfile, updateProfile, changePassword, logout } from '@/lib/api';
 import type { UserProfileResponse } from '@fileshift/shared-types';
@@ -95,7 +96,12 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto max-w-2xl p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">个人中心</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">个人中心</h1>
+          <Link href="/" className="text-sm text-muted-foreground hover:text-primary">
+            首页
+          </Link>
+        </div>
         <button
           onClick={handleLogout}
           className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
@@ -130,6 +136,19 @@ export default function ProfilePage() {
           <div>
             <span className="text-muted-foreground">注册时间：</span>
             <span>{new Date(profile.createdAt).toLocaleDateString('zh-CN')}</span>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-dashed border-border bg-muted/30 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">积分余额</p>
+              <p className="mt-1 text-2xl font-bold text-primary">--</p>
+              <p className="mt-1 text-xs text-muted-foreground">积分系统即将上线</p>
+            </div>
+            <div className="text-right text-sm text-muted-foreground">
+              <p>新用户赠送: 50 积分</p>
+            </div>
           </div>
         </div>
 

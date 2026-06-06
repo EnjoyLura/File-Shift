@@ -16,7 +16,9 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center p-8">
       {/* 顶部导航 */}
       <nav className="mb-12 flex w-full max-w-4xl items-center justify-between">
-        <h1 className="text-xl font-bold text-primary">FileShift</h1>
+        <Link href="/" className="text-xl font-bold text-primary">
+          FileShift
+        </Link>
         <div className="flex gap-4">
           {isLoggedIn ? (
             <>

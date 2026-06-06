@@ -87,7 +87,16 @@ export class AuthService {
     // 开发环境直接打印验证码（生产环境接入邮件服务）
     this.logger.log(`[DEV] 验证码已发送至 ${target}: ${code}`);
 
-    return { message: '验证码已发送，有效期 5 分钟' };
+    const response: { message: string; devCode?: string } = {
+      message: '验证码已发送，有效期 5 分钟',
+    };
+
+    // 非生产环境在响应中返回验证码（临时开发方案）
+    if (process.env.NODE_ENV !== 'production') {
+      response.devCode = code;
+    }
+
+    return response;
   }
 
   /** 邮箱注册 */

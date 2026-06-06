@@ -1,6 +1,6 @@
 import type { ApiResponse, AuthResponse, UserProfileResponse } from '@fileshift/shared-types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
@@ -17,7 +17,28 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     }
   }
 
-  const res = await fetch(url, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(url, { ...options, headers });
+  } catch {
+    throw new Error('网络连接失败，请检查网络后重试');
+  }
+
+  // 处理 401 Token 过期
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    }
+    throw new Error('登录已过期，请重新登录');
+  }
+
+  // 处理非 JSON 响应（如 502 网关错误返回 HTML）
+  const contentType = res.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    throw new Error(`服务器错误 (${res.status})，请稍后重试`);
+  }
+
   const json: ApiResponse<T> = await res.json();
 
   if (json.code !== 0) {
@@ -28,7 +49,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 /** 发送验证码 */
 export async function sendCode(target: string, type: string) {
-  return request<{ message: string }>('/v1/auth/send-code', {
+  return request<{ message: string; devCode?: string }>('/v1/auth/send-code', {
     method: 'POST',
     body: JSON.stringify({ target, type }),
   });

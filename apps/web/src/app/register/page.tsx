@@ -15,13 +15,18 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [devCode, setDevCode] = useState('');
 
   const handleSendCode = useCallback(async () => {
     if (!email || countdown > 0) return;
     try {
       setError('');
-      await sendCode(email, 'register');
+      const result = await sendCode(email, 'register');
       setCodeSent(true);
+      if (result.devCode) {
+        setDevCode(result.devCode);
+        setCode(result.devCode);
+      }
       setCountdown(60);
       const timer = setInterval(() => {
         setCountdown((prev) => {
@@ -63,7 +68,9 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6 rounded-lg border p-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-primary">FileShift</h1>
+          <Link href="/" className="text-2xl font-bold text-primary hover:opacity-80">
+            FileShift
+          </Link>
           <p className="mt-2 text-muted-foreground">创建新账号</p>
         </div>
 
@@ -105,6 +112,11 @@ export default function RegisterPage() {
                 {countdown > 0 ? `${countdown}s` : codeSent ? '重新发送' : '发送验证码'}
               </button>
             </div>
+            {devCode && (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+                [开发模式] 验证码已自动填入: <span className="font-mono font-bold">{devCode}</span>
+              </div>
+            )}
           </div>
 
           <div>
