@@ -6,7 +6,6 @@ export class UploadedFile {
   id: number;
 
   @Column({ type: 'varchar', length: 36, unique: true, comment: '文件UUID' })
-  @Index()
   fileId: string;
 
   @Column({ type: 'bigint', unsigned: true, comment: '上传用户ID' })

@@ -14,7 +14,6 @@ export class ConversionTask {
   id: number;
 
   @Column({ type: 'varchar', length: 32, unique: true, comment: '任务编号' })
-  @Index()
   taskNo: string;
 
   @Column({ type: 'bigint', unsigned: true, comment: '用户ID' })
