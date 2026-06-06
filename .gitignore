@@ -1,0 +1,40 @@
+# 依赖
+node_modules/
+
+# 构建产物
+.next/
+dist/
+build/
+out/
+
+# 环境变量
+.env
+.env.local
+.env.production
+.env.*.local
+
+# 上传文件
+uploads/
+!uploads/.gitkeep
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+*.log
+logs/
+
+# 测试覆盖率
+coverage/
+
+# Turbo
+.turbo/
+
+# pnpm
+.pnpm-store/
