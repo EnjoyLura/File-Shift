@@ -162,7 +162,7 @@ export class ConversionController {
       const fileSize = fs.statSync(file.absPath).size;
       res.set({
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(file.fileName)}"`,
+        'Content-Disposition': `attachment; filename="${file.fileName.replace(/[^\x20-\x7E]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
         'Content-Length': fileSize,
       });
       fs.createReadStream(file.absPath).pipe(res);

@@ -151,9 +151,12 @@ export class UploadController {
     // 设置响应头并直接流式发送文件
     const fileName = task.outputFileName || 'download';
     const fileSize = fs.statSync(absPath).size;
+    // RFC 5987 编码：ASCII 回退 + UTF-8 完整文件名
+    const asciiFallback = fileName.replace(/[^\x20-\x7E]/g, '_');
+    const utf8Name = encodeURIComponent(fileName);
     res.set({
       'Content-Type': task.outputMimeType || 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+      'Content-Disposition': `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8Name}`,
       'Content-Length': fileSize,
     });
 
