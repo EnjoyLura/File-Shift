@@ -186,3 +186,37 @@ export async function getTaskList(page = 1, pageSize = 20) {
 export function getDownloadUrl(taskNo: string): string {
   return `${API_BASE}/v1/files/download/${taskNo}`;
 }
+
+/** 创建 PDF 合并任务 (多文件) */
+export async function createMergeTask(data: {
+  fileIds: string[];
+  type?: string;
+  options?: Record<string, unknown>;
+}) {
+  return request<CreateConversionResponse>('/v1/conversions/merge', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/** 批量创建转换任务 */
+export async function batchCreateConversion(data: {
+  fileIds: string[];
+  type: string;
+  options?: Record<string, unknown>;
+}) {
+  return request<{
+    tasks: Array<{ fileId: string; success: boolean; taskNo?: string; error?: string }>;
+    total: number;
+    succeeded: number;
+    failed: number;
+  }>('/v1/conversions/batch', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/** 获取批量下载 URL */
+export function getBatchDownloadUrl(taskNos: string[]): string {
+  return `${API_BASE}/v1/conversions/batch-download?taskNos=${taskNos.join(',')}`;
+}

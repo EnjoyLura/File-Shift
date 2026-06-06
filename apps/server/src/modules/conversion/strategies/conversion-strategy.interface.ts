@@ -10,6 +10,8 @@ export interface ConversionStrategy {
 export interface ConversionInput {
   /** 输入文件绝对路径 */
   inputPath: string;
+  /** 输入文件绝对路径数组 (多文件操作如 PDF 合并) */
+  inputPaths?: string[];
   /** 输入文件 MIME 类型 */
   inputMimeType: string;
   /** 转换类型 (如 png-to-jpg) */

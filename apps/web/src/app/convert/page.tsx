@@ -22,6 +22,16 @@ const TOOL_GROUPS = [
     ],
   },
   {
+    title: '图片工具',
+    icon: '✂️',
+    tools: [
+      { type: 'image-crop', label: '图片裁剪' },
+      { type: 'image-rotate', label: '图片旋转' },
+      { type: 'image-watermark', label: '图片水印' },
+      { type: 'image-resize', label: '图片缩放' },
+    ],
+  },
+  {
     title: '文档转换',
     icon: '📄',
     tools: [
@@ -32,6 +42,50 @@ const TOOL_GROUPS = [
       { type: 'pdf-to-ppt', label: 'PDF → PPT' },
       { type: 'ppt-to-pdf', label: 'PPT → PDF' },
       { type: 'markdown-to-pdf', label: 'Markdown → PDF' },
+    ],
+  },
+  {
+    title: 'PDF 工具',
+    icon: '📑',
+    tools: [
+      { type: 'pdf-merge', label: 'PDF 合并' },
+      { type: 'pdf-split', label: 'PDF 拆分' },
+      { type: 'pdf-watermark', label: 'PDF 水印' },
+      { type: 'pdf-compress', label: 'PDF 压缩' },
+    ],
+  },
+  {
+    title: '视频转换',
+    icon: '🎬',
+    tools: [
+      { type: 'video-to-mp4', label: '视频 → MP4' },
+      { type: 'video-to-avi', label: '视频 → AVI' },
+      { type: 'video-to-mkv', label: '视频 → MKV' },
+      { type: 'video-to-mov', label: '视频 → MOV' },
+      { type: 'video-to-webm', label: '视频 → WebM' },
+    ],
+  },
+  {
+    title: '音频转换',
+    icon: '🎵',
+    tools: [
+      { type: 'audio-to-mp3', label: '音频 → MP3' },
+      { type: 'audio-to-wav', label: '音频 → WAV' },
+      { type: 'audio-to-flac', label: '音频 → FLAC' },
+      { type: 'audio-to-aac', label: '音频 → AAC' },
+      { type: 'audio-to-ogg', label: '音频 → OGG' },
+    ],
+  },
+  {
+    title: '音视频工具',
+    icon: '🎞️',
+    tools: [
+      { type: 'video-extract-audio', label: '提取音频' },
+      { type: 'video-trim', label: '视频裁剪' },
+      { type: 'audio-trim', label: '音频裁剪' },
+      { type: 'video-screenshot', label: '视频截图' },
+      { type: 'video-to-gif', label: '视频转 GIF' },
+      { type: 'video-compress', label: '视频压缩' },
     ],
   },
 ];
@@ -80,10 +134,6 @@ export default function ConvertPage() {
             </div>
           </section>
         ))}
-
-        <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-          更多格式转换功能（音视频、压缩解压等）即将上线，敬请期待！
-        </div>
       </main>
     </div>
   );

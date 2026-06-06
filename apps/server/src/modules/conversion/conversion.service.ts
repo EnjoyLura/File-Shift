@@ -11,10 +11,11 @@ import { UploadedFile } from '../upload/entities/uploaded-file.entity';
 import { UploadService } from '../upload/upload.service';
 import { CreditService } from '../credit/credit.service';
 import { BusinessException } from '../../common/exceptions/business.exception';
-import { IMAGE_QUEUE, DOCUMENT_QUEUE } from '../../queue/queue.module';
+import { IMAGE_QUEUE, DOCUMENT_QUEUE, MEDIA_QUEUE, PDF_QUEUE } from '../../queue/queue.module';
 
 /** 转换类型到 Category 映射 */
 const TYPE_CATEGORY_MAP: Record<string, TaskCategory> = {
+  // 图片格式转换
   'png-to-jpg': 'image',
   'jpg-to-png': 'image',
   'png-to-webp': 'image',
@@ -22,6 +23,12 @@ const TYPE_CATEGORY_MAP: Record<string, TaskCategory> = {
   'webp-to-png': 'image',
   'webp-to-jpg': 'image',
   'image-compress': 'image',
+  // 图片工具
+  'image-crop': 'image',
+  'image-rotate': 'image',
+  'image-watermark': 'image',
+  'image-resize': 'image',
+  // 文档转换
   'pdf-to-word': 'document',
   'word-to-pdf': 'document',
   'pdf-to-excel': 'document',
@@ -29,6 +36,30 @@ const TYPE_CATEGORY_MAP: Record<string, TaskCategory> = {
   'pdf-to-ppt': 'document',
   'ppt-to-pdf': 'document',
   'markdown-to-pdf': 'document',
+  // PDF 工具
+  'pdf-merge': 'tool',
+  'pdf-split': 'tool',
+  'pdf-watermark': 'tool',
+  'pdf-compress': 'compress',
+  // 视频格式转换
+  'video-to-mp4': 'media',
+  'video-to-avi': 'media',
+  'video-to-mkv': 'media',
+  'video-to-mov': 'media',
+  'video-to-webm': 'media',
+  // 音频格式转换
+  'audio-to-mp3': 'media',
+  'audio-to-wav': 'media',
+  'audio-to-flac': 'media',
+  'audio-to-aac': 'media',
+  'audio-to-ogg': 'media',
+  // 音视频工具
+  'video-extract-audio': 'media',
+  'video-trim': 'media',
+  'audio-trim': 'media',
+  'video-screenshot': 'tool',
+  'video-to-gif': 'media',
+  'video-compress': 'compress',
 };
 
 /** 预估转换时间 (秒) */
@@ -53,6 +84,10 @@ export class ConversionService {
     private readonly imageQueue: Queue,
     @InjectQueue(DOCUMENT_QUEUE)
     private readonly documentQueue: Queue,
+    @InjectQueue(MEDIA_QUEUE)
+    private readonly mediaQueue: Queue,
+    @InjectQueue(PDF_QUEUE)
+    private readonly pdfQueue: Queue,
   ) {}
 
   /**
@@ -132,18 +167,20 @@ export class ConversionService {
     };
 
     try {
+      const queueOpts = {
+        jobId: saved.taskNo,
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
+      };
+
       if (category === 'image') {
-        await this.imageQueue.add('convert', jobData, {
-          jobId: saved.taskNo,
-          removeOnComplete: { count: 1000 },
-          removeOnFail: { count: 5000 },
-        });
+        await this.imageQueue.add('convert', jobData, queueOpts);
+      } else if (category === 'media') {
+        await this.mediaQueue.add('convert', jobData, queueOpts);
+      } else if (conversionType.startsWith('pdf-')) {
+        await this.pdfQueue.add('convert', jobData, queueOpts);
       } else {
-        await this.documentQueue.add('convert', jobData, {
-          jobId: saved.taskNo,
-          removeOnComplete: { count: 1000 },
-          removeOnFail: { count: 5000 },
-        });
+        await this.documentQueue.add('convert', jobData, queueOpts);
       }
     } catch (err) {
       // 入队失败 → 退还积分
@@ -167,6 +204,111 @@ export class ConversionService {
       status: saved.status,
       creditsCost,
       estimatedTime: ESTIMATED_TIME[category] || 30,
+      createdAt: saved.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * 创建 PDF 合并任务 (多文件)
+   */
+  async createMergeTask(
+    userId: number,
+    fileIds: string[],
+    conversionType: string,
+    options?: Record<string, unknown>,
+  ) {
+    if (!fileIds || fileIds.length < 2 || fileIds.length > 20) {
+      throw new BusinessException(
+        ERROR_CODES.CONVERSION_TYPE_UNSUPPORTED,
+        'PDF 合并需要 2-20 个文件',
+      );
+    }
+
+    const category = TYPE_CATEGORY_MAP[conversionType] || 'tool';
+    const creditsCost = CREDIT_COSTS[conversionType] || 2;
+
+    await this.creditService.checkBalance(userId, creditsCost);
+
+    // 验证所有文件
+    const uploadedFiles: UploadedFile[] = [];
+    for (const fileId of fileIds) {
+      const file = await this.uploadService.findByFileId(fileId);
+      if (!file) {
+        throw new BusinessException(ERROR_CODES.FILE_NOT_FOUND, `文件不存在: ${fileId}`, 404);
+      }
+      if (Number(file.userId) !== userId) {
+        throw new BusinessException(ERROR_CODES.FILE_NOT_FOUND, '文件不存在', 404);
+      }
+      uploadedFiles.push(file);
+    }
+
+    // 扣除积分
+    const deducted = await this.creditService.deductCredits(
+      userId,
+      creditsCost,
+      undefined,
+      `${conversionType} 转换消费 ${creditsCost} 积分`,
+    );
+    if (!deducted) {
+      throw new BusinessException(ERROR_CODES.CREDIT_INSUFFICIENT, '积分扣除失败，余额不足');
+    }
+
+    // 创建任务 (以第一个文件为主文件)
+    const taskNo = this.generateTaskNo();
+    const task = this.taskRepo.create({
+      taskNo,
+      userId,
+      type: conversionType,
+      category,
+      status: 'queued',
+      inputFileId: uploadedFiles[0].fileId,
+      inputFileName: `${uploadedFiles.length} 个文件合并`,
+      inputFileSize: uploadedFiles.reduce((sum, f) => sum + f.fileSize, 0),
+      inputMimeType: 'application/pdf',
+      creditsCost,
+      progress: 0,
+    });
+    const saved = await this.taskRepo.save(task);
+
+    // 入队 (包含多文件路径)
+    const jobData = {
+      taskId: Number(saved.id),
+      taskNo: saved.taskNo,
+      userId,
+      conversionType,
+      inputFileId: uploadedFiles[0].fileId,
+      inputStoragePath: uploadedFiles[0].storagePath,
+      inputStoragePaths: uploadedFiles.map((f) => f.storagePath),
+      inputMimeType: 'application/pdf',
+      options,
+    };
+
+    try {
+      await this.pdfQueue.add('convert', jobData, {
+        jobId: saved.taskNo,
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
+      });
+    } catch (err) {
+      this.logger.error(`合并任务入队失败: ${saved.taskNo}`, err);
+      await this.creditService.refundCredits(
+        userId,
+        creditsCost,
+        saved.taskNo,
+        `任务入队失败，退还 ${creditsCost} 积分`,
+      );
+      saved.status = 'failed';
+      saved.errorMessage = '任务入队失败，积分已退还';
+      await this.taskRepo.save(saved);
+      throw new BusinessException(ERROR_CODES.CONVERSION_FAILED, '任务创建失败');
+    }
+
+    return {
+      taskNo: saved.taskNo,
+      status: saved.status,
+      creditsCost,
+      estimatedTime: ESTIMATED_TIME[category] || 30,
+      fileCount: uploadedFiles.length,
       createdAt: saved.createdAt.toISOString(),
     };
   }

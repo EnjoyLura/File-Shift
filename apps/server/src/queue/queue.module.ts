@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 
 export const IMAGE_QUEUE = 'image-conversion';
 export const DOCUMENT_QUEUE = 'document-conversion';
+export const MEDIA_QUEUE = 'media-conversion';
+export const PDF_QUEUE = 'pdf-conversion';
 
 @Global()
 @Module({
@@ -26,6 +28,14 @@ export const DOCUMENT_QUEUE = 'document-conversion';
       {
         name: DOCUMENT_QUEUE,
         defaultJobOptions: { attempts: 2, backoff: { type: 'exponential', delay: 5000 } },
+      },
+      {
+        name: MEDIA_QUEUE,
+        defaultJobOptions: { attempts: 2, backoff: { type: 'exponential', delay: 5000 } },
+      },
+      {
+        name: PDF_QUEUE,
+        defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
       },
     ),
   ],

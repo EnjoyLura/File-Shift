@@ -10,19 +10,36 @@ import {
   HttpStatus,
   DefaultValuePipe,
   ParseIntPipe,
+  Res,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { StreamableFile } from '@nestjs/common';
+import { Response } from 'express';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as archiver from 'archiver';
 import { ConversionService } from './conversion.service';
+import { UploadService } from '../upload/upload.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { BusinessException } from '../../common/exceptions/business.exception';
+import { ERROR_CODES } from '@fileshift/constants';
 
 @ApiTags('转换')
 @Controller('v1/conversions')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ConversionController {
-  constructor(private readonly conversionService: ConversionService) {}
+  private readonly logger = new Logger(ConversionController.name);
+
+  constructor(
+    private readonly conversionService: ConversionService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -33,6 +50,135 @@ export class ConversionController {
     @Body() body: { fileId: string; type: string; options?: Record<string, unknown> },
   ) {
     return this.conversionService.createTask(userId, body.fileId, body.type, body.options);
+  }
+
+  @Post('merge')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ conversion: { limit: 3, ttl: 60000 } })
+  @ApiOperation({ summary: '创建 PDF 合并任务 (多文件)' })
+  async createMergeTask(
+    @CurrentUser('sub') userId: number,
+    @Body() body: { fileIds: string[]; type?: string; options?: Record<string, unknown> },
+  ) {
+    const conversionType = body.type || 'pdf-merge';
+    return this.conversionService.createMergeTask(
+      userId,
+      body.fileIds,
+      conversionType,
+      body.options,
+    );
+  }
+
+  @Post('batch')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ conversion: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: '批量创建转换任务 (每个文件独立任务)' })
+  async batchCreateTasks(
+    @CurrentUser('sub') userId: number,
+    @Body()
+    body: {
+      fileIds: string[];
+      type: string;
+      options?: Record<string, unknown>;
+    },
+  ) {
+    if (!body.fileIds || body.fileIds.length === 0 || body.fileIds.length > 20) {
+      throw new BusinessException(
+        ERROR_CODES.CONVERSION_TYPE_UNSUPPORTED,
+        '批量处理支持 1-20 个文件',
+      );
+    }
+
+    const results = [];
+    for (const fileId of body.fileIds) {
+      try {
+        const result = await this.conversionService.createTask(
+          userId,
+          fileId,
+          body.type,
+          body.options,
+        );
+        results.push({ fileId, success: true, ...result });
+      } catch (err) {
+        results.push({
+          fileId,
+          success: false,
+          error: err instanceof Error ? err.message : '创建失败',
+        });
+      }
+    }
+
+    return {
+      tasks: results,
+      total: results.length,
+      succeeded: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+    };
+  }
+
+  @Get('batch-download')
+  @ApiOperation({ summary: '批量下载 (多个转换结果打包为 ZIP)' })
+  async batchDownload(
+    @CurrentUser('sub') userId: number,
+    @Query('taskNos') taskNosStr: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!taskNosStr) {
+      throw new BusinessException(ERROR_CODES.PARAM_INVALID, '缺少 taskNos 参数');
+    }
+
+    const taskNos = taskNosStr
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (taskNos.length === 0 || taskNos.length > 20) {
+      throw new BusinessException(ERROR_CODES.PARAM_INVALID, '支持 1-20 个任务');
+    }
+
+    // 验证所有任务
+    const validFiles: { absPath: string; fileName: string }[] = [];
+    for (const taskNo of taskNos) {
+      const task = await this.conversionService.findByTaskNo(taskNo);
+      if (!task || Number(task.userId) !== userId) continue;
+      if (task.status !== 'completed' || !task.outputStoragePath) continue;
+
+      const absPath = this.uploadService.getAbsolutePath(task.outputStoragePath);
+      if (fs.existsSync(absPath)) {
+        validFiles.push({
+          absPath,
+          fileName: task.outputFileName || `file-${taskNo}`,
+        });
+      }
+    }
+
+    if (validFiles.length === 0) {
+      throw new BusinessException(ERROR_CODES.FILE_NOT_FOUND, '没有可下载的文件');
+    }
+
+    // 如果只有一个文件，直接下载
+    if (validFiles.length === 1) {
+      const file = validFiles[0];
+      res.set({
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(file.fileName)}"`,
+      });
+      return new StreamableFile(fs.createReadStream(file.absPath));
+    }
+
+    // 多文件打包为 ZIP
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="fileshift-batch-${Date.now()}.zip"`,
+    });
+
+    const archive = new archiver.ZipArchive({ zlib: { level: 6 } });
+    archive.pipe(res);
+
+    for (const file of validFiles) {
+      archive.file(file.absPath, { name: file.fileName });
+    }
+
+    await archive.finalize();
   }
 
   @Get(':taskNo')

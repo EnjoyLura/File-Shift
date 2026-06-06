@@ -7,19 +7,29 @@ interface FileDropZoneProps {
   maxSize?: number; // MB
   onFileSelect: (file: File) => void;
   disabled?: boolean;
+  /** 是否允许多文件选择 */
+  multiple?: boolean;
 }
 
-export function FileDropZone({ accept, maxSize = 20, onFileSelect, disabled }: FileDropZoneProps) {
+export function FileDropZone({
+  accept,
+  maxSize = 20,
+  onFileSelect,
+  disabled,
+  multiple = false,
+}: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback(
-    (file: File) => {
-      if (file.size > maxSize * 1024 * 1024) {
-        alert(`文件大小不能超过 ${maxSize}MB`);
-        return;
+  const handleFiles = useCallback(
+    (files: FileList | File[]) => {
+      for (const file of Array.from(files)) {
+        if (file.size > maxSize * 1024 * 1024) {
+          alert(`${file.name} 超过 ${maxSize}MB 限制，已跳过`);
+          continue;
+        }
+        onFileSelect(file);
       }
-      onFileSelect(file);
     },
     [maxSize, onFileSelect],
   );
@@ -29,20 +39,17 @@ export function FileDropZone({ accept, maxSize = 20, onFileSelect, disabled }: F
       e.preventDefault();
       setIsDragging(false);
       if (disabled) return;
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
+      handleFiles(e.dataTransfer.files);
     },
-    [disabled, handleFile],
+    [disabled, handleFiles],
   );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) handleFile(file);
-      // 清空 input 以允许重复选择同一文件
+      if (e.target.files) handleFiles(e.target.files);
       if (inputRef.current) inputRef.current.value = '';
     },
-    [handleFile],
+    [handleFiles],
   );
 
   return (
@@ -64,6 +71,7 @@ export function FileDropZone({ accept, maxSize = 20, onFileSelect, disabled }: F
         ref={inputRef}
         type="file"
         accept={accept}
+        multiple={multiple}
         onChange={handleChange}
         className="hidden"
         disabled={disabled}
@@ -82,7 +90,11 @@ export function FileDropZone({ accept, maxSize = 20, onFileSelect, disabled }: F
         />
       </svg>
       <p className="mb-1 text-sm font-medium">
-        {isDragging ? '松开鼠标上传文件' : '点击或拖拽文件到此处'}
+        {isDragging
+          ? '松开鼠标上传文件'
+          : multiple
+            ? '点击或拖拽文件到此处 (可多选)'
+            : '点击或拖拽文件到此处'}
       </p>
       <p className="text-xs text-muted-foreground">
         最大文件大小: {maxSize}MB

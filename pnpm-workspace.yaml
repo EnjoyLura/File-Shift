@@ -5,3 +5,5 @@ allowBuilds:
   '@nestjs/core': true
   msgpackr-extract: true
   sharp: true
+minimumReleaseAgeExclude:
+  - '@types/archiver@8.0.0'

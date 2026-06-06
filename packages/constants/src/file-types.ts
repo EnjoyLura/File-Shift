@@ -27,12 +27,14 @@ export const SUPPORTED_MIME_TYPES = {
     'video/x-msvideo',
     'video/x-matroska',
     'video/quicktime',
+    'video/webm',
     'video/x-flv',
     'audio/mpeg',
     'audio/wav',
     'audio/aac',
     'audio/flac',
     'audio/ogg',
+    'audio/webm',
   ],
 } as const;
 

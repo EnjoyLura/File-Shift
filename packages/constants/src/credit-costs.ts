@@ -23,6 +23,16 @@ export const CREDIT_COSTS: Record<string, number> = {
   'png-to-ico': 1,
 
   // 音视频转换
+  'video-to-mp4': 5,
+  'video-to-avi': 5,
+  'video-to-mkv': 5,
+  'video-to-mov': 5,
+  'video-to-webm': 5,
+  'audio-to-mp3': 3,
+  'audio-to-wav': 3,
+  'audio-to-flac': 3,
+  'audio-to-aac': 3,
+  'audio-to-ogg': 3,
   'mp4-to-avi': 5,
   'avi-to-mp4': 5,
   'mp4-to-mkv': 5,
@@ -30,6 +40,8 @@ export const CREDIT_COSTS: Record<string, number> = {
   'mp3-to-wav': 3,
   'wav-to-mp3': 3,
   'video-extract-audio': 3,
+  'video-trim': 3,
+  'audio-trim': 2,
 
   // 压缩
   'image-compress': 1,
@@ -39,19 +51,15 @@ export const CREDIT_COSTS: Record<string, number> = {
   // 小工具
   'pdf-merge': 2,
   'pdf-split': 2,
-  'pdf-encrypt': 2,
-  'pdf-decrypt': 2,
   'pdf-watermark': 3,
+  // 图片工具
   'image-crop': 1,
   'image-rotate': 1,
   'image-watermark': 2,
-  'image-remove-bg': 5,
-  'image-concat': 2,
-  ocr: 5,
-  'video-crop': 3,
+  'image-resize': 1,
+  // 视频工具
   'video-screenshot': 2,
   'video-to-gif': 3,
-  'video-watermark': 5,
 };
 
 /** 注册赠送积分 */
