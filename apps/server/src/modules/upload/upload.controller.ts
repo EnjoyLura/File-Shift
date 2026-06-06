@@ -113,44 +113,51 @@ export class UploadController {
   async downloadFile(
     @CurrentUser('sub') userId: number,
     @Param('taskNo') taskNo: string,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ) {
     // 通过 taskNo 查找转换任务 (直接查询数据库)
-    const task = await this.uploadService.findConversionTask(taskNo);
+    let task;
+    try {
+      task = await this.uploadService.findConversionTask(taskNo);
+    } catch {
+      return res.status(500).json({ code: 99001, message: '查询任务失败' });
+    }
+
     if (!task) {
-      throw new NotFoundException('任务不存在');
+      return res.status(404).json({ code: 12003, message: '任务不存在' });
     }
 
     // 验证用户归属
     if (Number(task.userId) !== userId) {
-      throw new ForbiddenException('无权访问此文件');
+      return res.status(403).json({ code: 99001, message: '无权访问此文件' });
     }
 
     // 验证任务状态
     if (task.status !== 'completed' || !task.outputStoragePath) {
-      throw new BusinessException(ERROR_CODES.FILE_NOT_FOUND, '文件尚未准备好，请等待转换完成');
+      return res.status(400).json({ code: 12003, message: '文件尚未准备好，请等待转换完成' });
     }
 
     // 验证是否过期
     if (task.expiresAt && new Date(task.expiresAt) < new Date()) {
-      throw new BusinessException(ERROR_CODES.FILE_EXPIRED, '文件已过期，请重新转换');
+      return res.status(400).json({ code: 12004, message: '文件已过期，请重新转换' });
     }
 
     // 获取文件路径
     const absPath = this.uploadService.getAbsolutePath(task.outputStoragePath);
     if (!fs.existsSync(absPath)) {
-      throw new BusinessException(ERROR_CODES.FILE_NOT_FOUND, '文件不存在，可能已被清理');
+      return res.status(404).json({ code: 12003, message: '文件不存在，可能已被清理' });
     }
 
-    // 设置响应头
+    // 设置响应头并直接流式发送文件
     const fileName = task.outputFileName || 'download';
+    const fileSize = fs.statSync(absPath).size;
     res.set({
       'Content-Type': task.outputMimeType || 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
-      'Content-Length': task.outputFileSize || 0,
+      'Content-Length': fileSize,
     });
 
     const fileStream = fs.createReadStream(absPath);
-    return new StreamableFile(fileStream);
+    fileStream.pipe(res);
   }
 }

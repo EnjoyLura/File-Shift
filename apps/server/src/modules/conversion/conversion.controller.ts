@@ -122,10 +122,10 @@ export class ConversionController {
   async batchDownload(
     @CurrentUser('sub') userId: number,
     @Query('taskNos') taskNosStr: string,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ) {
     if (!taskNosStr) {
-      throw new BusinessException(ERROR_CODES.PARAM_INVALID, '缺少 taskNos 参数');
+      return res.status(400).json({ code: 10000, message: '缺少 taskNos 参数' });
     }
 
     const taskNos = taskNosStr
@@ -133,7 +133,7 @@ export class ConversionController {
       .map((s) => s.trim())
       .filter(Boolean);
     if (taskNos.length === 0 || taskNos.length > 20) {
-      throw new BusinessException(ERROR_CODES.PARAM_INVALID, '支持 1-20 个任务');
+      return res.status(400).json({ code: 10000, message: '支持 1-20 个任务' });
     }
 
     // 验证所有任务
@@ -153,17 +153,20 @@ export class ConversionController {
     }
 
     if (validFiles.length === 0) {
-      throw new BusinessException(ERROR_CODES.FILE_NOT_FOUND, '没有可下载的文件');
+      return res.status(404).json({ code: 12003, message: '没有可下载的文件' });
     }
 
-    // 如果只有一个文件，直接下载
+    // 如果只有一个文件，直接流式下载
     if (validFiles.length === 1) {
       const file = validFiles[0];
+      const fileSize = fs.statSync(file.absPath).size;
       res.set({
         'Content-Type': 'application/octet-stream',
         'Content-Disposition': `attachment; filename="${encodeURIComponent(file.fileName)}"`,
+        'Content-Length': fileSize,
       });
-      return new StreamableFile(fs.createReadStream(file.absPath));
+      fs.createReadStream(file.absPath).pipe(res);
+      return;
     }
 
     // 多文件打包为 ZIP
