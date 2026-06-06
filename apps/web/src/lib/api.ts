@@ -216,12 +216,18 @@ export async function authenticatedDownload(taskNo: string, fileName?: string): 
   }
 
   const blob = await res.blob();
-  const contentType = res.headers.get('content-disposition');
-  // 从 Content-Disposition 中提取文件名
-  const serverFileName = contentType?.match(/filename\*?="?([^";\n]+)"?/i)?.[1];
-  const decodedName = serverFileName
-    ? decodeURIComponent(serverFileName.replace(/UTF-8''/i, ''))
-    : fileName || `${taskNo}.file`;
+  const disposition = res.headers.get('content-disposition');
+  // 优先匹配 RFC 5987 的 filename*=UTF-8''... (支持中文等非 ASCII 文件名)
+  const utf8Match = disposition?.match(/filename\*=UTF-8''([^;\n]+)/i);
+  const basicMatch = disposition?.match(/filename="([^"]+)"/);
+  let decodedName: string;
+  if (utf8Match) {
+    decodedName = decodeURIComponent(utf8Match[1].trim());
+  } else if (basicMatch) {
+    decodedName = basicMatch[1];
+  } else {
+    decodedName = fileName || `${taskNo}.file`;
+  }
 
   const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
