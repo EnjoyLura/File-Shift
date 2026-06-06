@@ -101,6 +101,9 @@ export default function ProfilePage() {
           <Link href="/" className="text-sm text-muted-foreground hover:text-primary">
             首页
           </Link>
+          <Link href="/convert" className="text-sm text-muted-foreground hover:text-primary">
+            转换中心
+          </Link>
         </div>
         <button
           onClick={handleLogout}
@@ -143,11 +146,13 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">积分余额</p>
-              <p className="mt-1 text-2xl font-bold text-primary">--</p>
-              <p className="mt-1 text-xs text-muted-foreground">积分系统即将上线</p>
+              <p className="mt-1 text-2xl font-bold text-primary">
+                {profile.credits?.balance ?? 0}
+              </p>
             </div>
             <div className="text-right text-sm text-muted-foreground">
-              <p>新用户赠送: 50 积分</p>
+              <p>累计获得: {profile.credits?.totalEarned ?? 0}</p>
+              <p>累计消费: {profile.credits?.totalSpent ?? 0}</p>
             </div>
           </div>
         </div>

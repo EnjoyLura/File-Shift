@@ -32,3 +32,28 @@ export interface CreateConversionRequest {
   type: string;
   options?: Record<string, unknown>;
 }
+
+/** 文件上传响应 */
+export interface UploadResponse {
+  fileId: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedAt: string;
+}
+
+/** 创建转换任务响应 */
+export interface CreateConversionResponse {
+  taskNo: string;
+  status: TaskStatus;
+  creditsCost: number;
+  estimatedTime: number;
+  createdAt: string;
+}
+
+/** 转换任务详情响应 (含下载链接) */
+export interface ConversionTaskDetail extends ConversionTask {
+  downloadUrl?: string;
+  inputMimeType?: string;
+  outputMimeType?: string;
+}

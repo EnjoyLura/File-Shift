@@ -1,3 +1,5 @@
+import type { UserCredits } from './user.types';
+
 /** 注册请求 */
 export interface RegisterRequest {
   email: string;
@@ -45,6 +47,7 @@ export interface UserProfileResponse {
   role: 'user' | 'admin';
   inviteCode: string;
   createdAt: string;
+  credits?: UserCredits;
 }
 
 /** 修改密码请求 */

@@ -46,6 +46,15 @@ export class User {
   @Column({ type: 'bigint', unsigned: true, nullable: true, comment: '邀请人ID' })
   invitedBy: number | null;
 
+  @Column({ type: 'int', unsigned: true, default: 0, comment: '积分余额' })
+  creditsBalance: number;
+
+  @Column({ type: 'int', unsigned: true, default: 0, comment: '累计获得积分' })
+  creditsTotalEarned: number;
+
+  @Column({ type: 'int', unsigned: true, default: 0, comment: '累计消费积分' })
+  creditsTotalSpent: number;
+
   @Column({ type: 'datetime', nullable: true, comment: '最后登录时间' })
   lastLoginAt: Date | null;
 

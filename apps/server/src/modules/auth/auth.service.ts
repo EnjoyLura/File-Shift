@@ -18,6 +18,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { SendCodeDto } from './dto/send-code.dto';
 import { REDIS_CLIENT } from '../../database/redis.module';
+import { REGISTER_GIFT_CREDITS } from '@fileshift/constants';
 
 interface TokenPayload {
   sub: number;
@@ -133,6 +134,8 @@ export class AuthService {
       inviteCode: '', // BeforeInsert 会自动生成
       invitedBy,
       lastLoginAt: new Date(),
+      creditsBalance: REGISTER_GIFT_CREDITS,
+      creditsTotalEarned: REGISTER_GIFT_CREDITS,
     });
     const saved = await this.userRepo.save(user);
 

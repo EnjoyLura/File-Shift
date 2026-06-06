@@ -1,4 +1,13 @@
-import type { ApiResponse, AuthResponse, UserProfileResponse } from '@fileshift/shared-types';
+import type {
+  ApiResponse,
+  AuthResponse,
+  UserProfileResponse,
+  UploadResponse,
+  CreateConversionResponse,
+  ConversionTaskDetail,
+  PaginatedData,
+  ConversionTask,
+} from '@fileshift/shared-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -108,4 +117,72 @@ export async function changePassword(oldPassword: string, newPassword: string) {
     method: 'POST',
     body: JSON.stringify({ oldPassword, newPassword }),
   });
+}
+
+// ========== 文件上传 ==========
+
+/** 上传文件 (multipart/form-data) */
+export async function uploadFile(file: File): Promise<UploadResponse> {
+  const url = `${API_BASE}/v1/files/upload`;
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers: Record<string, string> = {};
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'POST', headers, body: formData });
+  } catch {
+    throw new Error('网络连接失败，请检查网络后重试');
+  }
+
+  const json: ApiResponse<UploadResponse> = await res.json();
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    }
+    throw new Error(json.message || '登录已过期，请重新登录');
+  }
+  if (json.code !== 0) {
+    throw new Error(json.message || '上传失败');
+  }
+  return json.data;
+}
+
+// ========== 转换任务 ==========
+
+/** 创建转换任务 */
+export async function createConversion(data: {
+  fileId: string;
+  type: string;
+  options?: Record<string, unknown>;
+}) {
+  return request<CreateConversionResponse>('/v1/conversions', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/** 查询任务状态 */
+export async function getTaskStatus(taskNo: string) {
+  return request<ConversionTaskDetail>(`/v1/conversions/${taskNo}`);
+}
+
+/** 获取任务列表 */
+export async function getTaskList(page = 1, pageSize = 20) {
+  return request<PaginatedData<ConversionTask>>(
+    `/v1/conversions?page=${page}&pageSize=${pageSize}`,
+  );
+}
+
+/** 获取下载 URL */
+export function getDownloadUrl(taskNo: string): string {
+  return `${API_BASE}/v1/files/download/${taskNo}`;
 }

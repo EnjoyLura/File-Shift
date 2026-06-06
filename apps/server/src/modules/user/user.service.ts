@@ -29,6 +29,11 @@ export class UserService {
       role: user.role,
       inviteCode: user.inviteCode,
       createdAt: user.createdAt.toISOString(),
+      credits: {
+        balance: user.creditsBalance || 0,
+        totalEarned: user.creditsTotalEarned || 0,
+        totalSpent: user.creditsTotalSpent || 0,
+      },
     };
   }
 
@@ -57,6 +62,11 @@ export class UserService {
       role: user.role,
       inviteCode: user.inviteCode,
       createdAt: user.createdAt.toISOString(),
+      credits: {
+        balance: user.creditsBalance || 0,
+        totalEarned: user.creditsTotalEarned || 0,
+        totalSpent: user.creditsTotalSpent || 0,
+      },
     };
   }
 

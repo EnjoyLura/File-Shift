@@ -33,30 +33,34 @@ export class AllExceptionsFilter implements ExceptionFilter {
         if (Array.isArray(res.message)) {
           message = (res.message as string[]).join('; ');
         }
-      }
-
-      // 映射 HTTP 状态码到业务错误码
-      switch (status) {
-        case 400:
-          code = 10001;
-          break;
-        case 401:
-          code = 10002;
-          break;
-        case 403:
-          code = 10003;
-          break;
-        case 404:
-          code = 10004;
-          break;
-        case 409:
-          code = 10005;
-          break;
-        case 429:
-          code = 10006;
-          break;
-        default:
-          code = 99000;
+        // 支持业务错误码透传 (BusinessException)
+        if (typeof res.code === 'number') {
+          code = res.code as number;
+        } else {
+          // 映射 HTTP 状态码到通用错误码
+          switch (status) {
+            case 400:
+              code = 10001;
+              break;
+            case 401:
+              code = 10002;
+              break;
+            case 403:
+              code = 10003;
+              break;
+            case 404:
+              code = 10004;
+              break;
+            case 409:
+              code = 10005;
+              break;
+            case 429:
+              code = 10006;
+              break;
+            default:
+              code = 99000;
+          }
+        }
       }
     } else {
       this.logger.error('未捕获异常', exception instanceof Error ? exception.stack : exception);
