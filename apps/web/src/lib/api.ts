@@ -24,15 +24,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error('网络连接失败，请检查网络后重试');
   }
 
-  // 处理 401 Token 过期
-  if (res.status === 401) {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-    }
-    throw new Error('登录已过期，请重新登录');
-  }
-
   // 处理非 JSON 响应（如 502 网关错误返回 HTML）
   const contentType = res.headers.get('content-type');
   if (!contentType || !contentType.includes('application/json')) {
@@ -40,6 +31,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   const json: ApiResponse<T> = await res.json();
+
+  // 处理 401 Token 过期（先读取 JSON 获取服务端实际错误消息）
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    }
+    throw new Error(json.message || '登录已过期，请重新登录');
+  }
 
   if (json.code !== 0) {
     throw new Error(json.message || '请求失败');
