@@ -142,7 +142,7 @@ export class AuthService {
     // 缓存 Refresh Token
     await this.redis.setex(
       `session:${saved.id}`,
-      this.configService.get<number>('JWT_REFRESH_EXPIRES_IN', 604800),
+      Number(this.configService.get('JWT_REFRESH_EXPIRES_IN') || 604800),
       tokens.refreshToken,
     );
 
@@ -182,7 +182,7 @@ export class AuthService {
     // 缓存 Refresh Token
     await this.redis.setex(
       `session:${user.id}`,
-      this.configService.get<number>('JWT_REFRESH_EXPIRES_IN', 604800),
+      Number(this.configService.get('JWT_REFRESH_EXPIRES_IN') || 604800),
       tokens.refreshToken,
     );
 
@@ -221,7 +221,7 @@ export class AuthService {
       // 更新缓存
       await this.redis.setex(
         `session:${user.id}`,
-        this.configService.get<number>('JWT_REFRESH_EXPIRES_IN', 604800),
+        Number(this.configService.get('JWT_REFRESH_EXPIRES_IN') || 604800),
         tokens.refreshToken,
       );
 
@@ -292,18 +292,18 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_SECRET'),
-      expiresIn: this.configService.get<number>('JWT_EXPIRES_IN', 7200),
+      expiresIn: Number(this.configService.get('JWT_EXPIRES_IN') || 7200),
     });
 
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get<number>('JWT_REFRESH_EXPIRES_IN', 604800),
+      expiresIn: Number(this.configService.get('JWT_REFRESH_EXPIRES_IN') || 604800),
     });
 
     return {
       accessToken,
       refreshToken,
-      expiresIn: this.configService.get<number>('JWT_EXPIRES_IN', 7200),
+      expiresIn: Number(this.configService.get('JWT_EXPIRES_IN') || 7200),
     };
   }
 }
