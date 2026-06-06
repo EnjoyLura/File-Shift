@@ -33,6 +33,13 @@ logs/
 # 测试覆盖率
 coverage/
 
+# 截图和临时测试文件
+*.png
+*.jpg
+*.jpeg
+test-api.js
+deploy-now.js
+
 # Turbo
 .turbo/
 
