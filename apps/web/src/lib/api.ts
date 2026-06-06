@@ -176,10 +176,18 @@ export async function getTaskStatus(taskNo: string) {
 }
 
 /** 获取任务列表 */
-export async function getTaskList(page = 1, pageSize = 20) {
-  return request<PaginatedData<ConversionTask>>(
-    `/v1/conversions?page=${page}&pageSize=${pageSize}`,
-  );
+export async function getTaskList(
+  page = 1,
+  pageSize = 20,
+  status?: string,
+  type?: string,
+  category?: string,
+) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (status) params.set('status', status);
+  if (type) params.set('type', type);
+  if (category) params.set('category', category);
+  return request<PaginatedData<ConversionTask>>(`/v1/conversions?${params.toString()}`);
 }
 
 /** 获取下载 URL */
@@ -219,4 +227,105 @@ export async function batchCreateConversion(data: {
 /** 获取批量下载 URL */
 export function getBatchDownloadUrl(taskNos: string[]): string {
   return `${API_BASE}/v1/conversions/batch-download?taskNos=${taskNos.join(',')}`;
+}
+
+/** 删除任务 */
+export async function deleteTask(taskNo: string) {
+  return request<void>(`/v1/conversions/${taskNo}`, { method: 'DELETE' });
+}
+
+// ========== 邀请系统 ==========
+
+/** 获取邀请统计 */
+export async function getInviteStats() {
+  return request<{
+    inviteCode: string;
+    inviteCount: number;
+    totalEarned: number;
+    rewardPerInvite: number;
+  }>('/v1/user/invite-stats');
+}
+
+/** 获取邀请历史 */
+export async function getInviteHistory(page = 1, pageSize = 20) {
+  return request<
+    PaginatedData<{
+      id: number;
+      nickname: string | null;
+      email: string | null;
+      reward: number;
+      registeredAt: string;
+    }>
+  >(`/v1/user/invite-history?page=${page}&pageSize=${pageSize}`);
+}
+
+// ========== 管理后台 ==========
+
+/** 获取系统统计 */
+export async function getAdminStats() {
+  return request<{
+    totalUsers: number;
+    totalTasks: number;
+    completedTasks: number;
+    failedTasks: number;
+    queuedTasks: number;
+    todayUsers: number;
+    todayTasks: number;
+    totalCreditsSpent: number;
+  }>('/v1/admin/stats');
+}
+
+/** 获取用户列表(管理) */
+export async function getAdminUsers(page = 1, pageSize = 20, search?: string, status?: string) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (search) params.set('search', search);
+  if (status) params.set('status', status);
+  return request<
+    PaginatedData<{
+      id: number;
+      email: string | null;
+      nickname: string | null;
+      role: string;
+      status: string;
+      inviteCode: string;
+      invitedBy: number | null;
+      creditsBalance: number;
+      creditsTotalEarned: number;
+      creditsTotalSpent: number;
+      lastLoginAt: string | null;
+      createdAt: string;
+    }>
+  >(`/v1/admin/users?${params.toString()}`);
+}
+
+/** 修改用户状态 */
+export async function updateAdminUserStatus(userId: number, status: 'active' | 'disabled') {
+  return request<{ message: string }>(`/v1/admin/users/${userId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+/** 调整用户积分 */
+export async function updateAdminUserCredits(userId: number, amount: number, reason?: string) {
+  return request<{ message: string; newBalance: number }>(`/v1/admin/users/${userId}/credits`, {
+    method: 'PATCH',
+    body: JSON.stringify({ amount, reason }),
+  });
+}
+
+/** 获取最近任务(管理) */
+export async function getAdminTasks(page = 1, pageSize = 20) {
+  return request<
+    PaginatedData<{
+      id: number;
+      taskNo: string;
+      userId: number;
+      type: string;
+      status: string;
+      inputFileName: string | null;
+      creditsCost: number;
+      createdAt: string;
+    }>
+  >(`/v1/admin/tasks?page=${page}&pageSize=${pageSize}`);
 }

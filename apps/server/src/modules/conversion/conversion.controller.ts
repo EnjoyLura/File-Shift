@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Param,
   Query,
@@ -187,13 +188,23 @@ export class ConversionController {
     return this.conversionService.getTaskStatus(taskNo, userId);
   }
 
+  @Delete(':taskNo')
+  @ApiOperation({ summary: '删除任务' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteTask(@CurrentUser('sub') userId: number, @Param('taskNo') taskNo: string) {
+    await this.conversionService.deleteTask(taskNo, userId);
+  }
+
   @Get()
   @ApiOperation({ summary: '获取转换任务列表' })
   async getTaskList(
     @CurrentUser('sub') userId: number,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('pageSize', new DefaultValuePipe(20), ParseIntPipe) pageSize: number,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('category') category?: string,
   ) {
-    return this.conversionService.getTaskList(userId, page, pageSize);
+    return this.conversionService.getTaskList(userId, page, pageSize, status, type, category);
   }
 }

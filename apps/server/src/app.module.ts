@@ -10,6 +10,7 @@ import { UserModule } from './modules/user/user.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { ConversionModule } from './modules/conversion/conversion.module';
 import { CreditModule } from './modules/credit/credit.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { QueueModule } from './queue/queue.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -46,6 +47,7 @@ import { AppService } from './app.service';
     UserModule,
     UploadModule,
     ConversionModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

@@ -57,4 +57,22 @@ export class UserController {
   ) {
     return this.creditService.getTransactions(userId, page || 1, pageSize || 20);
   }
+
+  @Get('invite-stats')
+  @ApiOperation({ summary: '获取邀请统计' })
+  getInviteStats(@CurrentUser('sub') userId: number) {
+    return this.userService.getInviteStats(userId);
+  }
+
+  @Get('invite-history')
+  @ApiOperation({ summary: '获取邀请历史' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number })
+  getInviteHistory(
+    @CurrentUser('sub') userId: number,
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+  ) {
+    return this.userService.getInviteHistory(userId, page || 1, pageSize || 20);
+  }
 }

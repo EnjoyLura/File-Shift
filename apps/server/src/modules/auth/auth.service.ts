@@ -18,7 +18,11 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { SendCodeDto } from './dto/send-code.dto';
 import { REDIS_CLIENT } from '../../database/redis.module';
-import { REGISTER_GIFT_CREDITS } from '@fileshift/constants';
+import {
+  REGISTER_GIFT_CREDITS,
+  INVITE_REWARD_CREDITS,
+  INVITEE_BONUS_CREDITS,
+} from '@fileshift/constants';
 import { CreditService } from '../credit/credit.service';
 
 interface TokenPayload {
@@ -143,6 +147,15 @@ export class AuthService {
 
     // 记录注册赠送积分流水
     await this.creditService.logRegisterGift(Number(saved.id), REGISTER_GIFT_CREDITS);
+
+    // 发放邀请奖励
+    if (invitedBy) {
+      // 给邀请人奖励 20 积分
+      await this.creditService.grantInviteReward(invitedBy, INVITE_REWARD_CREDITS);
+      // 给被邀请人额外奖励 10 积分
+      await this.creditService.grantInviteeBonus(Number(saved.id), INVITEE_BONUS_CREDITS);
+      this.logger.log(`邀请奖励已发放: inviter=${invitedBy}, invitee=${saved.id}`);
+    }
 
     // 生成 Token
     const tokens = await this.generateTokens(saved);

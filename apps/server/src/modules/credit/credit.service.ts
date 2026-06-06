@@ -146,6 +146,70 @@ export class CreditService {
   }
 
   /**
+   * 发放邀请奖励积分 (给邀请人)
+   */
+  async grantInviteReward(inviterId: number, amount: number): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder()
+        .update(User)
+        .set({
+          creditsBalance: () => `creditsBalance + ${amount}`,
+          creditsTotalEarned: () => `creditsTotalEarned + ${amount}`,
+        })
+        .where('id = :inviterId', { inviterId })
+        .execute();
+
+      const user = await manager.findOne(User, {
+        where: { id: inviterId },
+        select: ['creditsBalance'],
+      });
+
+      await manager.save(CreditTransaction, {
+        userId: inviterId,
+        type: 'invite_reward' as TransactionType,
+        amount,
+        balanceAfter: user?.creditsBalance ?? 0,
+        description: `邀请奖励 ${amount} 积分`,
+      });
+    });
+
+    this.logger.log(`邀请奖励发放: inviterId=${inviterId}, amount=${amount}`);
+  }
+
+  /**
+   * 发放被邀请人额外奖励
+   */
+  async grantInviteeBonus(inviteeId: number, amount: number): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder()
+        .update(User)
+        .set({
+          creditsBalance: () => `creditsBalance + ${amount}`,
+          creditsTotalEarned: () => `creditsTotalEarned + ${amount}`,
+        })
+        .where('id = :inviteeId', { inviteeId })
+        .execute();
+
+      const user = await manager.findOne(User, {
+        where: { id: inviteeId },
+        select: ['creditsBalance'],
+      });
+
+      await manager.save(CreditTransaction, {
+        userId: inviteeId,
+        type: 'invitee_bonus' as TransactionType,
+        amount,
+        balanceAfter: user?.creditsBalance ?? 0,
+        description: `被邀请额外奖励 ${amount} 积分`,
+      });
+    });
+
+    this.logger.log(`被邀请人奖励发放: inviteeId=${inviteeId}, amount=${amount}`);
+  }
+
+  /**
    * 获取用户积分流水记录 (分页)
    */
   async getTransactions(userId: number, page = 1, pageSize = 20) {

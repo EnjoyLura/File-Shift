@@ -3,8 +3,30 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getProfile, updateProfile, changePassword, logout } from '@/lib/api';
+import {
+  getProfile,
+  updateProfile,
+  changePassword,
+  logout,
+  getInviteStats,
+  getInviteHistory,
+} from '@/lib/api';
 import type { UserProfileResponse } from '@fileshift/shared-types';
+
+interface InviteStats {
+  inviteCode: string;
+  inviteCount: number;
+  totalEarned: number;
+  rewardPerInvite: number;
+}
+
+interface Invitee {
+  id: number;
+  nickname: string | null;
+  email: string | null;
+  reward: number;
+  registeredAt: string;
+}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -20,6 +42,10 @@ export default function ProfilePage() {
   const [oldPwd, setOldPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
 
+  const [inviteStats, setInviteStats] = useState<InviteStats | null>(null);
+  const [invitees, setInvitees] = useState<Invitee[]>([]);
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
@@ -34,6 +60,15 @@ export default function ProfilePage() {
       const data = await getProfile();
       setProfile(data);
       setNickname(data.nickname || '');
+      // 加载邀请统计
+      try {
+        const stats = await getInviteStats();
+        setInviteStats(stats);
+        const history = await getInviteHistory(1, 10);
+        setInvitees(history.list);
+      } catch {
+        // 邀请接口失败不影响主流程
+      }
     } catch {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
@@ -83,6 +118,14 @@ export default function ProfilePage() {
     router.push('/login');
   };
 
+  const handleCopyInvite = () => {
+    const link = `${window.location.origin}/register?invite=${profile?.inviteCode}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -104,6 +147,11 @@ export default function ProfilePage() {
           <Link href="/convert" className="text-sm text-muted-foreground hover:text-primary">
             转换中心
           </Link>
+          {profile.role === 'admin' && (
+            <Link href="/admin" className="text-sm text-muted-foreground hover:text-primary">
+              管理后台
+            </Link>
+          )}
         </div>
         <button
           onClick={handleLogout}
@@ -252,6 +300,67 @@ export default function ProfilePage() {
           </button>
         )}
       </div>
+
+      {/* 邀请好友 */}
+      {inviteStats && (
+        <div className="mt-6 rounded-lg border p-6">
+          <h2 className="mb-4 text-lg font-semibold">邀请好友赚积分</h2>
+          <div className="mb-4 grid grid-cols-3 gap-4 text-center">
+            <div className="rounded-md bg-primary/5 p-3">
+              <p className="text-2xl font-bold text-primary">{inviteStats.inviteCount}</p>
+              <p className="text-xs text-muted-foreground">已邀请人数</p>
+            </div>
+            <div className="rounded-md bg-primary/5 p-3">
+              <p className="text-2xl font-bold text-primary">{inviteStats.totalEarned}</p>
+              <p className="text-xs text-muted-foreground">累计获得积分</p>
+            </div>
+            <div className="rounded-md bg-primary/5 p-3">
+              <p className="text-2xl font-bold text-primary">{inviteStats.rewardPerInvite}</p>
+              <p className="text-xs text-muted-foreground">每邀请一人奖励</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 rounded-md border bg-muted/30 px-3 py-2 font-mono text-sm">
+              {typeof window !== 'undefined'
+                ? `${window.location.origin}/register?invite=${inviteStats.inviteCode}`
+                : inviteStats.inviteCode}
+            </div>
+            <button
+              onClick={handleCopyInvite}
+              className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+            >
+              {copied ? '已复制' : '复制邀请链接'}
+            </button>
+          </div>
+          {invitees.length > 0 && (
+            <div className="mt-4">
+              <h3 className="mb-2 text-sm font-medium text-muted-foreground">最近邀请记录</h3>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2">昵称</th>
+                    <th className="pb-2">邮箱</th>
+                    <th className="pb-2">奖励</th>
+                    <th className="pb-2">注册时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invitees.map((inv) => (
+                    <tr key={inv.id} className="border-b last:border-0">
+                      <td className="py-2">{inv.nickname || '-'}</td>
+                      <td className="py-2 text-muted-foreground">{inv.email || '-'}</td>
+                      <td className="py-2 text-primary">+{inv.reward}</td>
+                      <td className="py-2 text-muted-foreground">
+                        {new Date(inv.registeredAt).toLocaleDateString('zh-CN')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

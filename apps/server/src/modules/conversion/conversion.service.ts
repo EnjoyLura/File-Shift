@@ -351,11 +351,23 @@ export class ConversionService {
   }
 
   /**
-   * 获取用户任务列表 (分页)
+   * 获取用户任务列表 (分页 + 筛选)
    */
-  async getTaskList(userId: number, page = 1, pageSize = 20) {
+  async getTaskList(
+    userId: number,
+    page = 1,
+    pageSize = 20,
+    status?: string,
+    type?: string,
+    category?: string,
+  ) {
+    const where: Record<string, unknown> = { userId };
+    if (status) where.status = status;
+    if (type) where.type = type;
+    if (category) where.category = category;
+
     const [list, total] = await this.taskRepo.findAndCount({
-      where: { userId },
+      where,
       order: { createdAt: 'DESC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -383,6 +395,19 @@ export class ConversionService {
       page,
       pageSize,
     };
+  }
+
+  /**
+   * 删除任务（软删除）
+   */
+  async deleteTask(taskNo: string, userId: number): Promise<void> {
+    const task = await this.taskRepo.findOne({
+      where: { taskNo, userId },
+    });
+    if (!task) {
+      throw new BusinessException(ERROR_CODES.TASK_NOT_FOUND, '任务不存在', 404);
+    }
+    await this.taskRepo.softDelete(task.id);
   }
 
   /**
