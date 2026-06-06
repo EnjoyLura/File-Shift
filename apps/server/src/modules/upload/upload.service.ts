@@ -78,10 +78,13 @@ export class UploadService {
     await this.fileValidation.validateMagicNumber(finalPath, file.mimetype);
 
     // 写入数据库
+    // 修复 multer 对非 ASCII 文件名的 Latin-1 编码问题
+    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+
     const entity = this.fileRepo.create({
       fileId,
       userId,
-      originalName: file.originalname,
+      originalName,
       storagePath: relativePath,
       fileSize: file.size,
       mimeType: file.mimetype,

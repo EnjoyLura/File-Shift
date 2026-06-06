@@ -7,7 +7,6 @@ import Link from 'next/link';
 function AnimatedCounter({ target, duration = 1500 }: { target: number; duration?: number }) {
   const [count, setCount] = useState(0);
   useEffect(() => {
-    const start = 0;
     const startTime = Date.now();
     const tick = () => {
       const elapsed = Date.now() - startTime;
