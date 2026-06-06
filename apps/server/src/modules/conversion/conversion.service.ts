@@ -92,7 +92,12 @@ export class ConversionService {
     }
 
     // 5. 原子扣除积分
-    const deducted = await this.creditService.deductCredits(userId, creditsCost);
+    const deducted = await this.creditService.deductCredits(
+      userId,
+      creditsCost,
+      undefined,
+      `${conversionType} 转换消费 ${creditsCost} 积分`,
+    );
     if (!deducted) {
       throw new BusinessException(ERROR_CODES.CREDIT_INSUFFICIENT, '积分扣除失败，余额不足');
     }
@@ -143,7 +148,12 @@ export class ConversionService {
     } catch (err) {
       // 入队失败 → 退还积分
       this.logger.error(`任务入队失败: ${saved.taskNo}`, err);
-      await this.creditService.refundCredits(userId, creditsCost);
+      await this.creditService.refundCredits(
+        userId,
+        creditsCost,
+        saved.taskNo,
+        `任务入队失败，退还 ${creditsCost} 积分`,
+      );
       saved.status = 'failed';
       saved.errorMessage = '任务入队失败，积分已退还';
       await this.taskRepo.save(saved);
@@ -286,7 +296,12 @@ export class ConversionService {
     if (!task) return;
 
     // 退还积分
-    await this.creditService.refundCredits(Number(task.userId), task.creditsCost);
+    await this.creditService.refundCredits(
+      Number(task.userId),
+      task.creditsCost,
+      task.taskNo,
+      `转换失败，退还 ${task.creditsCost} 积分`,
+    );
 
     await this.taskRepo.update(taskId, {
       status: 'failed',

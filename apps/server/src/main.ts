@@ -1,12 +1,21 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseTransformInterceptor } from './common/interceptors/response-transform.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Helmet 安全头
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // Swagger UI 需要内联脚本
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   // 全局前缀
   app.setGlobalPrefix('api');

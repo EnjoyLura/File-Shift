@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ALL_SUPPORTED_MIME_TYPES, MAX_FILE_SIZE_FREE, ERROR_CODES } from '@fileshift/constants';
 import { UploadedFile } from './entities/uploaded-file.entity';
 import { ConversionTask } from '../conversion/entities/conversion-task.entity';
+import { FileValidationService } from '../../common/services/file-validation.service';
 import { BusinessException } from '../../common/exceptions/business.exception';
 
 @Injectable()
@@ -21,6 +22,7 @@ export class UploadService {
     @InjectRepository(ConversionTask)
     private readonly taskRepo: Repository<ConversionTask>,
     private readonly configService: ConfigService,
+    private readonly fileValidation: FileValidationService,
   ) {
     this.uploadDir = this.configService.get<string>('UPLOAD_DIR', './uploads');
     // 确保上传根目录存在
@@ -34,6 +36,9 @@ export class UploadService {
    * Multer 已将文件写入磁盘，此方法记录到 DB 并返回元信息
    */
   async saveUploadedFile(userId: number, file: Express.Multer.File): Promise<UploadedFile> {
+    // 验证文件扩展名
+    this.fileValidation.validateExtension(file.originalname, file.mimetype);
+
     // 验证 MIME 类型
     if (!ALL_SUPPORTED_MIME_TYPES.includes(file.mimetype as any)) {
       throw new BusinessException(
@@ -68,6 +73,9 @@ export class UploadService {
     if (file.path && file.path !== finalPath) {
       fs.renameSync(file.path, finalPath);
     }
+
+    // Magic Number 校验 (读取文件头部验证实际类型)
+    await this.fileValidation.validateMagicNumber(finalPath, file.mimetype);
 
     // 写入数据库
     const entity = this.fileRepo.create({

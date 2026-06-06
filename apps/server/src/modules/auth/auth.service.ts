@@ -19,6 +19,7 @@ import { LoginDto } from './dto/login.dto';
 import { SendCodeDto } from './dto/send-code.dto';
 import { REDIS_CLIENT } from '../../database/redis.module';
 import { REGISTER_GIFT_CREDITS } from '@fileshift/constants';
+import { CreditService } from '../credit/credit.service';
 
 interface TokenPayload {
   sub: number;
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly codeRepo: Repository<VerificationCode>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly creditService: CreditService,
     @Inject(REDIS_CLIENT)
     private readonly redis: Redis,
   ) {}
@@ -138,6 +140,9 @@ export class AuthService {
       creditsTotalEarned: REGISTER_GIFT_CREDITS,
     });
     const saved = await this.userRepo.save(user);
+
+    // 记录注册赠送积分流水
+    await this.creditService.logRegisterGift(Number(saved.id), REGISTER_GIFT_CREDITS);
 
     // 生成 Token
     const tokens = await this.generateTokens(saved);

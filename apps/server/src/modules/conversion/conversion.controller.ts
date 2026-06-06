@@ -12,6 +12,7 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ConversionService } from './conversion.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -25,6 +26,7 @@ export class ConversionController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
+  @Throttle({ conversion: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: '创建转换任务' })
   async createTask(
     @CurrentUser('sub') userId: number,

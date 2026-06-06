@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { diskStorage } from 'multer';
@@ -78,6 +79,7 @@ export class UploadController {
 
   @Post('upload')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ upload: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: '上传文件' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(

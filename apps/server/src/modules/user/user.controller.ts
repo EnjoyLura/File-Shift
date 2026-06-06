@@ -4,12 +4,14 @@ import {
   Patch,
   Post,
   Body,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { UserService } from './user.service';
+import { CreditService } from '../credit/credit.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -20,7 +22,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly creditService: CreditService,
+  ) {}
 
   @Get('profile')
   @ApiOperation({ summary: '获取当前用户信息' })
@@ -39,5 +44,17 @@ export class UserController {
   @ApiOperation({ summary: '修改密码' })
   changePassword(@CurrentUser('sub') userId: number, @Body() dto: ChangePasswordDto) {
     return this.userService.changePassword(userId, dto);
+  }
+
+  @Get('credit-transactions')
+  @ApiOperation({ summary: '获取积分流水记录' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number })
+  getCreditTransactions(
+    @CurrentUser('sub') userId: number,
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+  ) {
+    return this.creditService.getTransactions(userId, page || 1, pageSize || 20);
   }
 }

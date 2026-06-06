@@ -22,8 +22,19 @@ import { AppService } from './app.service';
     }),
     ThrottlerModule.forRoot([
       {
+        name: 'default',
         ttl: 60000,
-        limit: 30,
+        limit: 60,
+      },
+      {
+        name: 'upload',
+        ttl: 60000,
+        limit: 10,
+      },
+      {
+        name: 'conversion',
+        ttl: 60000,
+        limit: 5,
       },
     ]),
     ScheduleModule.forRoot(),
