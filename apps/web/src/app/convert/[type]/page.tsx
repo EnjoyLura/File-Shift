@@ -12,7 +12,7 @@ import {
   createConversion,
   createMergeTask,
   getTaskStatus,
-  getDownloadUrl,
+  authenticatedDownload,
 } from '@/lib/api';
 
 /** 转换类型显示名称映射 */
@@ -386,13 +386,21 @@ export default function ConvertTypePage() {
             </div>
 
             <div className="flex gap-3">
-              <a
-                href={getDownloadUrl(taskDetail.taskNo)}
-                download
+              <button
+                onClick={async () => {
+                  try {
+                    await authenticatedDownload(
+                      taskDetail.taskNo,
+                      taskDetail.outputFileName || undefined,
+                    );
+                  } catch (err: unknown) {
+                    alert(err instanceof Error ? err.message : '下载失败');
+                  }
+                }}
                 className="flex-1 rounded-md bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
                 下载文件
-              </a>
+              </button>
               <button
                 onClick={handleReset}
                 className="rounded-md border px-4 py-2.5 text-sm hover:bg-accent"

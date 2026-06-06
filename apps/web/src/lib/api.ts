@@ -195,6 +195,44 @@ export function getDownloadUrl(taskNo: string): string {
   return `${API_BASE}/v1/files/download/${taskNo}`;
 }
 
+/** 带认证的文件下载 (fetch + blob) */
+export async function authenticatedDownload(taskNo: string, fileName?: string): Promise<void> {
+  const url = `${API_BASE}/v1/files/download/${taskNo}`;
+  const headers: Record<string, string> = {};
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error('登录已过期，请重新登录');
+    }
+    const json = await res.json().catch(() => null);
+    throw new Error(json?.message || `下载失败 (${res.status})`);
+  }
+
+  const blob = await res.blob();
+  const contentType = res.headers.get('content-disposition');
+  // 从 Content-Disposition 中提取文件名
+  const serverFileName = contentType?.match(/filename\*?="?([^";\n]+)"?/i)?.[1];
+  const decodedName = serverFileName
+    ? decodeURIComponent(serverFileName.replace(/UTF-8''/i, ''))
+    : fileName || `${taskNo}.file`;
+
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = decodedName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
 /** 创建 PDF 合并任务 (多文件) */
 export async function createMergeTask(data: {
   fileIds: string[];

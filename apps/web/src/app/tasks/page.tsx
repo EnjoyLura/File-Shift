@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ConversionTask, PaginatedData } from '@fileshift/shared-types';
 import { Header } from '@/components/layout/header';
-import { getTaskList, getDownloadUrl, deleteTask } from '@/lib/api';
+import { getTaskList, authenticatedDownload, deleteTask } from '@/lib/api';
 
 const STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
@@ -75,6 +75,7 @@ export default function TasksPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [downloadingTaskNo, setDownloadingTaskNo] = useState<string | null>(null);
   const [deletingTaskNo, setDeletingTaskNo] = useState<string | null>(null);
 
   useEffect(() => {
@@ -112,6 +113,17 @@ export default function TasksPage() {
     if (filter === 'status') setStatusFilter(value);
     if (filter === 'category') setCategoryFilter(value);
     setPage(1);
+  };
+
+  const handleDownload = async (taskNo: string, fileName?: string) => {
+    try {
+      setDownloadingTaskNo(taskNo);
+      await authenticatedDownload(taskNo, fileName);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : '下载失败');
+    } finally {
+      setDownloadingTaskNo(null);
+    }
   };
 
   const handleDelete = async (taskNo: string) => {
@@ -212,13 +224,15 @@ export default function TasksPage() {
 
                     <div className="ml-4 flex shrink-0 items-center gap-2">
                       {task.status === 'completed' && (
-                        <a
-                          href={getDownloadUrl(task.taskNo)}
-                          download
-                          className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90"
+                        <button
+                          onClick={() =>
+                            handleDownload(task.taskNo, task.outputFileName || undefined)
+                          }
+                          disabled={downloadingTaskNo === task.taskNo}
+                          className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                         >
-                          下载
-                        </a>
+                          {downloadingTaskNo === task.taskNo ? '下载中...' : '下载'}
+                        </button>
                       )}
                       <button
                         onClick={() => handleDelete(task.taskNo)}
