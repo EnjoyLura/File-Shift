@@ -17,6 +17,7 @@ interface ConvertJobData {
   inputMimeType: string;
   /** 多文件操作的存储路径数组 */
   inputStoragePaths?: string[];
+  inputFileName?: string;
   options?: Record<string, unknown>;
 }
 
@@ -40,6 +41,7 @@ export class PdfProcessor extends WorkerHost {
       inputStoragePath,
       inputStoragePaths,
       inputMimeType,
+      inputFileName,
       options,
     } = job.data;
 
@@ -65,6 +67,7 @@ export class PdfProcessor extends WorkerHost {
         inputMimeType,
         conversionType,
         outputDir,
+        originalName: inputFileName,
         options,
       });
 

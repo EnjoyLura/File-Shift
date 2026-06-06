@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 import * as path from 'path';
 import * as fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import {
   ConversionStrategy,
   ConversionInput,
   ConversionOutput,
+  generateOutputFileName,
 } from './conversion-strategy.interface';
 
 /** PDF 策略支持的转换类型 */
@@ -23,7 +23,7 @@ export class PdfStrategy implements ConversionStrategy {
   }
 
   async convert(input: ConversionInput): Promise<ConversionOutput> {
-    const { conversionType, outputDir } = input;
+    const { conversionType, outputDir, originalName } = input;
 
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
@@ -31,20 +31,24 @@ export class PdfStrategy implements ConversionStrategy {
 
     switch (conversionType) {
       case 'pdf-merge':
-        return this.merge(input.inputPaths || [], outputDir);
+        return this.merge(input.inputPaths || [], outputDir, originalName);
       case 'pdf-split':
-        return this.split(input.inputPath, outputDir, input.options);
+        return this.split(input.inputPath, outputDir, originalName, input.options);
       case 'pdf-watermark':
-        return this.addWatermark(input.inputPath, outputDir, input.options);
+        return this.addWatermark(input.inputPath, outputDir, originalName, input.options);
       case 'pdf-compress':
-        return this.compress(input.inputPath, outputDir);
+        return this.compress(input.inputPath, outputDir, originalName);
       default:
         throw new Error(`不支持的 PDF 操作: ${conversionType}`);
     }
   }
 
   /** 合并多个 PDF */
-  private async merge(inputPaths: string[], outputDir: string): Promise<ConversionOutput> {
+  private async merge(
+    inputPaths: string[],
+    outputDir: string,
+    originalName?: string,
+  ): Promise<ConversionOutput> {
     if (!inputPaths || inputPaths.length < 2) {
       throw new Error('PDF 合并至少需要 2 个文件');
     }
@@ -61,7 +65,7 @@ export class PdfStrategy implements ConversionStrategy {
       pages.forEach((page) => mergedPdf.addPage(page));
     }
 
-    const outputFileName = `${uuidv4()}.pdf`;
+    const outputFileName = generateOutputFileName('.pdf', originalName);
     const outputPath = path.join(outputDir, outputFileName);
     const pdfBytes = await mergedPdf.save();
     fs.writeFileSync(outputPath, pdfBytes);
@@ -79,6 +83,7 @@ export class PdfStrategy implements ConversionStrategy {
   private async split(
     inputPath: string,
     outputDir: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     if (!fs.existsSync(inputPath)) {
@@ -102,7 +107,7 @@ export class PdfStrategy implements ConversionStrategy {
     pages.forEach((page) => newPdf.addPage(page));
 
     const outputBytes = await newPdf.save();
-    const outputFileName = `${uuidv4()}.pdf`;
+    const outputFileName = generateOutputFileName('.pdf', originalName);
     const outputPath = path.join(outputDir, outputFileName);
     fs.writeFileSync(outputPath, outputBytes);
 
@@ -119,6 +124,7 @@ export class PdfStrategy implements ConversionStrategy {
   private async addWatermark(
     inputPath: string,
     outputDir: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     if (!fs.existsSync(inputPath)) {
@@ -152,7 +158,7 @@ export class PdfStrategy implements ConversionStrategy {
     }
 
     const outputBytes = await pdfDoc.save();
-    const outputFileName = `${uuidv4()}.pdf`;
+    const outputFileName = generateOutputFileName('.pdf', originalName);
     const outputPath = path.join(outputDir, outputFileName);
     fs.writeFileSync(outputPath, outputBytes);
 
@@ -166,7 +172,11 @@ export class PdfStrategy implements ConversionStrategy {
   }
 
   /** PDF 压缩 (优化对象引用) */
-  private async compress(inputPath: string, outputDir: string): Promise<ConversionOutput> {
+  private async compress(
+    inputPath: string,
+    outputDir: string,
+    originalName?: string,
+  ): Promise<ConversionOutput> {
     if (!fs.existsSync(inputPath)) {
       throw new Error(`输入文件不存在: ${inputPath}`);
     }
@@ -181,7 +191,7 @@ export class PdfStrategy implements ConversionStrategy {
       addDefaultPage: false,
     });
 
-    const outputFileName = `${uuidv4()}.pdf`;
+    const outputFileName = generateOutputFileName('.pdf', originalName);
     const outputPath = path.join(outputDir, outputFileName);
     fs.writeFileSync(outputPath, outputBytes);
 

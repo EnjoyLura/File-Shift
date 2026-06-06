@@ -163,6 +163,7 @@ export class ConversionService {
       inputFileId: uploadedFile.fileId,
       inputStoragePath: uploadedFile.storagePath,
       inputMimeType: uploadedFile.mimeType,
+      inputFileName: uploadedFile.originalName,
       options,
     };
 
@@ -280,6 +281,7 @@ export class ConversionService {
       inputStoragePath: uploadedFiles[0].storagePath,
       inputStoragePaths: uploadedFiles.map((f) => f.storagePath),
       inputMimeType: 'application/pdf',
+      inputFileName: 'merged.pdf',
       options,
     };
 

@@ -15,6 +15,7 @@ interface ConvertJobData {
   inputFileId: string;
   inputStoragePath: string;
   inputMimeType: string;
+  inputFileName?: string;
   options?: Record<string, unknown>;
 }
 
@@ -31,7 +32,15 @@ export class ImageProcessor extends WorkerHost {
   }
 
   async process(job: Job<ConvertJobData>): Promise<void> {
-    const { taskId, taskNo, conversionType, inputStoragePath, inputMimeType, options } = job.data;
+    const {
+      taskId,
+      taskNo,
+      conversionType,
+      inputStoragePath,
+      inputMimeType,
+      inputFileName,
+      options,
+    } = job.data;
 
     this.logger.log(`开始处理图片任务: ${taskNo} (${conversionType})`);
 
@@ -51,6 +60,7 @@ export class ImageProcessor extends WorkerHost {
         inputMimeType,
         conversionType,
         outputDir,
+        originalName: inputFileName,
         options,
       });
 

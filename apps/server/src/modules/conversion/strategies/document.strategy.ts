@@ -3,11 +3,11 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import {
   ConversionStrategy,
   ConversionInput,
   ConversionOutput,
+  generateOutputFileName,
 } from './conversion-strategy.interface';
 
 const execAsync = promisify(exec);
@@ -68,7 +68,7 @@ export class DocumentStrategy implements ConversionStrategy {
   }
 
   async convert(input: ConversionInput): Promise<ConversionOutput> {
-    const { inputPath, conversionType, outputDir } = input;
+    const { inputPath, conversionType, outputDir, originalName } = input;
 
     // 确保输出目录存在
     if (!fs.existsSync(outputDir)) {
@@ -82,11 +82,11 @@ export class DocumentStrategy implements ConversionStrategy {
 
     // 对于 *-to-pdf 类型，LibreOffice 直接转换
     if (conversionType.endsWith('-to-pdf') || conversionType === 'markdown-to-pdf') {
-      return this.convertToPdf(inputPath, outputDir, outputExt, conversionType);
+      return this.convertToPdf(inputPath, outputDir, outputExt, conversionType, originalName);
     }
 
     // 对于 pdf-to-* 类型，使用 LibreOffice 将 PDF 转为目标格式
-    return this.convertFromPdf(inputPath, outputDir, outputExt, conversionType);
+    return this.convertFromPdf(inputPath, outputDir, outputExt, conversionType, originalName);
   }
 
   /** 转换为 PDF */
@@ -95,6 +95,7 @@ export class DocumentStrategy implements ConversionStrategy {
     outputDir: string,
     outputExt: string,
     conversionType: string,
+    originalName?: string,
   ): Promise<ConversionOutput> {
     const cmd = [
       'libreoffice',
@@ -113,8 +114,8 @@ export class DocumentStrategy implements ConversionStrategy {
     const inputBaseName = path.basename(inputPath, path.extname(inputPath));
     const loOutputPath = path.join(outputDir, `${inputBaseName}.pdf`);
 
-    // 重命名为 UUID 文件名
-    const outputFileName = `${uuidv4()}${outputExt}`;
+    // 重命名为用户原始文件名
+    const outputFileName = generateOutputFileName(outputExt, originalName);
     const outputPath = path.join(outputDir, outputFileName);
     if (fs.existsSync(loOutputPath)) {
       fs.renameSync(loOutputPath, outputPath);
@@ -139,6 +140,7 @@ export class DocumentStrategy implements ConversionStrategy {
     outputDir: string,
     outputExt: string,
     conversionType: string,
+    originalName?: string,
   ): Promise<ConversionOutput> {
     // LibreOffice 可以将 PDF 导入并导出为其他格式
     // 目标格式名 (去掉 . 前缀)
@@ -162,8 +164,8 @@ export class DocumentStrategy implements ConversionStrategy {
     const inputBaseName = path.basename(inputPath, path.extname(inputPath));
     const loOutputPath = path.join(outputDir, `${inputBaseName}${outputExt}`);
 
-    // 重命名为 UUID 文件名
-    const outputFileName = `${uuidv4()}${outputExt}`;
+    // 重命名为用户原始文件名
+    const outputFileName = generateOutputFileName(outputExt, originalName);
     const outputPath = path.join(outputDir, outputFileName);
     if (fs.existsSync(loOutputPath)) {
       fs.renameSync(loOutputPath, outputPath);

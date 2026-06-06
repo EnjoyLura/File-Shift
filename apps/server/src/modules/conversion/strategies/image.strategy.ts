@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as sharp from 'sharp';
 import * as path from 'path';
 import * as fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import {
   ConversionStrategy,
   ConversionInput,
   ConversionOutput,
+  generateOutputFileName,
 } from './conversion-strategy.interface';
 
 /** 图片策略支持的转换类型 */
@@ -57,7 +57,7 @@ export class ImageStrategy implements ConversionStrategy {
   }
 
   async convert(input: ConversionInput): Promise<ConversionOutput> {
-    const { inputPath, conversionType, outputDir } = input;
+    const { inputPath, conversionType, outputDir, originalName } = input;
 
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
@@ -66,17 +66,23 @@ export class ImageStrategy implements ConversionStrategy {
     // 根据转换类型分派处理
     switch (conversionType) {
       case 'image-crop':
-        return this.crop(inputPath, outputDir, input.options);
+        return this.crop(inputPath, outputDir, originalName, input.options);
       case 'image-rotate':
-        return this.rotate(inputPath, outputDir, input.options);
+        return this.rotate(inputPath, outputDir, originalName, input.options);
       case 'image-watermark':
-        return this.watermark(inputPath, outputDir, input.options);
+        return this.watermark(inputPath, outputDir, originalName, input.options);
       case 'image-resize':
-        return this.resize(inputPath, outputDir, input.options);
+        return this.resize(inputPath, outputDir, originalName, input.options);
       case 'image-compress':
-        return this.compress(inputPath, outputDir, input.options);
+        return this.compress(inputPath, outputDir, originalName, input.options);
       default:
-        return this.formatConvert(inputPath, outputDir, conversionType, input.options);
+        return this.formatConvert(
+          inputPath,
+          outputDir,
+          conversionType,
+          originalName,
+          input.options,
+        );
     }
   }
 
@@ -85,6 +91,7 @@ export class ImageStrategy implements ConversionStrategy {
     inputPath: string,
     outputDir: string,
     conversionType: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const targetFormat = TYPE_TO_FORMAT[conversionType];
@@ -96,7 +103,7 @@ export class ImageStrategy implements ConversionStrategy {
     pipeline = this.applyCompression(pipeline, targetFormat, options);
 
     const ext = FORMAT_TO_EXT[targetFormat];
-    const outputFileName = `${uuidv4()}${ext}`;
+    const outputFileName = generateOutputFileName(ext, originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     await pipeline.toFile(outputPath);
@@ -115,6 +122,7 @@ export class ImageStrategy implements ConversionStrategy {
   private async compress(
     inputPath: string,
     outputDir: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     let pipeline = sharp(inputPath);
@@ -123,7 +131,7 @@ export class ImageStrategy implements ConversionStrategy {
     pipeline = this.applyCompression(pipeline, format, options);
 
     const ext = FORMAT_TO_EXT[format] || '.jpg';
-    const outputFileName = `${uuidv4()}${ext}`;
+    const outputFileName = generateOutputFileName(ext, originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     await pipeline.toFile(outputPath);
@@ -142,6 +150,7 @@ export class ImageStrategy implements ConversionStrategy {
   private async crop(
     inputPath: string,
     outputDir: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const left = (options?.left as number) || 0;
@@ -164,7 +173,7 @@ export class ImageStrategy implements ConversionStrategy {
     });
 
     const ext = FORMAT_TO_EXT[format] || '.jpg';
-    const outputFileName = `${uuidv4()}${ext}`;
+    const outputFileName = generateOutputFileName(ext, originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     await pipeline.toFile(outputPath);
@@ -183,6 +192,7 @@ export class ImageStrategy implements ConversionStrategy {
   private async rotate(
     inputPath: string,
     outputDir: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const angle = (options?.angle as number) || 0;
@@ -193,7 +203,7 @@ export class ImageStrategy implements ConversionStrategy {
     const pipeline = sharp(inputPath).rotate(angle);
 
     const ext = FORMAT_TO_EXT[format] || '.jpg';
-    const outputFileName = `${uuidv4()}${ext}`;
+    const outputFileName = generateOutputFileName(ext, originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     await pipeline.toFile(outputPath);
@@ -212,6 +222,7 @@ export class ImageStrategy implements ConversionStrategy {
   private async watermark(
     inputPath: string,
     outputDir: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const text = (options?.text as string) || 'FileShift';
@@ -271,7 +282,7 @@ export class ImageStrategy implements ConversionStrategy {
     ]);
 
     const ext = FORMAT_TO_EXT[format] || '.jpg';
-    const outputFileName = `${uuidv4()}${ext}`;
+    const outputFileName = generateOutputFileName(ext, originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     await pipeline.toFile(outputPath);
@@ -290,6 +301,7 @@ export class ImageStrategy implements ConversionStrategy {
   private async resize(
     inputPath: string,
     outputDir: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const width = (options?.width as number) || undefined;
@@ -302,7 +314,7 @@ export class ImageStrategy implements ConversionStrategy {
     const pipeline = sharp(inputPath).resize({ width, height, fit, withoutEnlargement: true });
 
     const ext = FORMAT_TO_EXT[format] || '.jpg';
-    const outputFileName = `${uuidv4()}${ext}`;
+    const outputFileName = generateOutputFileName(ext, originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     await pipeline.toFile(outputPath);

@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import ffmpeg = require('fluent-ffmpeg');
 import {
   ConversionStrategy,
   ConversionInput,
   ConversionOutput,
+  generateOutputFileName,
 } from './conversion-strategy.interface';
 
 // fluent-ffmpeg 类型补充: timeout 方法存在于运行时但类型定义缺少
@@ -73,7 +73,7 @@ export class MediaStrategy implements ConversionStrategy {
   }
 
   async convert(input: ConversionInput): Promise<ConversionOutput> {
-    const { inputPath, conversionType, outputDir, options } = input;
+    const { inputPath, conversionType, outputDir, options, originalName } = input;
 
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
@@ -90,18 +90,25 @@ export class MediaStrategy implements ConversionStrategy {
 
     switch (conversionType) {
       case 'video-screenshot':
-        return this.screenshot(inputPath, outputDir, formatInfo, options);
+        return this.screenshot(inputPath, outputDir, formatInfo, originalName, options);
       case 'video-to-gif':
-        return this.videoToGif(inputPath, outputDir, formatInfo, options);
+        return this.videoToGif(inputPath, outputDir, formatInfo, originalName, options);
       case 'video-trim':
       case 'audio-trim':
-        return this.trim(inputPath, outputDir, formatInfo, conversionType, options);
+        return this.trim(inputPath, outputDir, formatInfo, conversionType, originalName, options);
       case 'video-extract-audio':
-        return this.extractAudio(inputPath, outputDir, formatInfo);
+        return this.extractAudio(inputPath, outputDir, formatInfo, originalName);
       case 'video-compress':
-        return this.videoCompress(inputPath, outputDir, formatInfo, options);
+        return this.videoCompress(inputPath, outputDir, formatInfo, originalName, options);
       default:
-        return this.formatConvert(inputPath, outputDir, formatInfo, conversionType, options);
+        return this.formatConvert(
+          inputPath,
+          outputDir,
+          formatInfo,
+          conversionType,
+          originalName,
+          options,
+        );
     }
   }
 
@@ -111,9 +118,10 @@ export class MediaStrategy implements ConversionStrategy {
     outputDir: string,
     formatInfo: { ext: string; mime: string },
     conversionType: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
-    const outputFileName = `${uuidv4()}${formatInfo.ext}`;
+    const outputFileName = generateOutputFileName(formatInfo.ext, originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     return new Promise((resolve, reject) => {
@@ -163,10 +171,11 @@ export class MediaStrategy implements ConversionStrategy {
     inputPath: string,
     outputDir: string,
     formatInfo: { ext: string; mime: string },
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const timestamp = (options?.timestamp as string) || '00:00:05';
-    const outputFileName = `${uuidv4()}.jpg`;
+    const outputFileName = generateOutputFileName('.jpg', originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     return new Promise((resolve, reject) => {
@@ -197,6 +206,7 @@ export class MediaStrategy implements ConversionStrategy {
     inputPath: string,
     outputDir: string,
     formatInfo: { ext: string; mime: string },
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const start = (options?.start as string) || '00:00:00';
@@ -204,7 +214,7 @@ export class MediaStrategy implements ConversionStrategy {
     const fps = (options?.fps as number) || 10;
     const width = (options?.width as number) || 480;
 
-    const outputFileName = `${uuidv4()}.gif`;
+    const outputFileName = generateOutputFileName('.gif', originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     return new Promise((resolve, reject) => {
@@ -236,13 +246,14 @@ export class MediaStrategy implements ConversionStrategy {
     outputDir: string,
     formatInfo: { ext: string; mime: string },
     conversionType: string,
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const start = (options?.start as string) || '00:00:00';
     const duration = (options?.duration as string) || undefined;
     const end = (options?.end as string) || undefined;
 
-    const outputFileName = `${uuidv4()}${formatInfo.ext}`;
+    const outputFileName = generateOutputFileName(formatInfo.ext, originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     return new Promise((resolve, reject) => {
@@ -282,8 +293,9 @@ export class MediaStrategy implements ConversionStrategy {
     inputPath: string,
     outputDir: string,
     formatInfo: { ext: string; mime: string },
+    originalName?: string,
   ): Promise<ConversionOutput> {
-    const outputFileName = `${uuidv4()}.mp3`;
+    const outputFileName = generateOutputFileName('.mp3', originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     return new Promise((resolve, reject) => {
@@ -315,12 +327,13 @@ export class MediaStrategy implements ConversionStrategy {
     inputPath: string,
     outputDir: string,
     formatInfo: { ext: string; mime: string },
+    originalName?: string,
     options?: Record<string, unknown>,
   ): Promise<ConversionOutput> {
     const crf = (options?.crf as number) || 28; // 23=默认, 28=较低质量更小
     const preset = (options?.preset as string) || 'medium';
 
-    const outputFileName = `${uuidv4()}.mp4`;
+    const outputFileName = generateOutputFileName('.mp4', originalName);
     const outputPath = path.join(outputDir, outputFileName);
 
     return new Promise((resolve, reject) => {
