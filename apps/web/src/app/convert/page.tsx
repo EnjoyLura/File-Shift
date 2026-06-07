@@ -13,6 +13,7 @@ import {
   Music,
   Film,
   Sparkles,
+  Coins,
 } from 'lucide-react';
 import { CREDIT_COSTS } from '@fileshift/constants';
 import { Input } from '@/components/ui/input';
@@ -164,7 +165,7 @@ export default function DesignConvertPage() {
 
         {/* Search + Filter */}
         <div className="mb-8 flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 max-w-lg">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="搜索工具..."
@@ -224,10 +225,10 @@ export default function DesignConvertPage() {
                             {tool.label}
                           </p>
                           <div className="mt-2 flex items-center gap-1">
-                            <span className="text-xs text-muted-foreground">
+                            <Coins className="h-3.5 w-3.5 text-amber-500" />
+                            <span className="text-xs font-medium text-muted-foreground">
                               {CREDIT_COSTS[tool.type] ?? 1}
                             </span>
-                            <span className="text-xs text-muted-foreground">积分</span>
                           </div>
                         </Link>
                       </motion.div>

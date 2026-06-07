@@ -4,7 +4,18 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Menu, X, LayoutGrid, History, User, LogOut, ChevronRight, Lock } from 'lucide-react';
+import {
+  Zap,
+  Menu,
+  X,
+  LayoutGrid,
+  History,
+  User,
+  LogOut,
+  ChevronRight,
+  Lock,
+  Coins,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -25,6 +36,7 @@ export function DesignHeader() {
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInitial, setUserInitial] = useState('U');
+  const [userCredits, setUserCredits] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -34,6 +46,27 @@ export function DesignHeader() {
     // 尝试从缓存获取昵称首字母
     const cached = localStorage.getItem('userNickname');
     if (cached) setUserInitial(cached.charAt(0).toUpperCase());
+    // 尝试从缓存获取积分
+    const cachedCredits = localStorage.getItem('userCredits');
+    if (cachedCredits) setUserCredits(Number(cachedCredits));
+    // 如果已登录，获取最新积分
+    if (token) {
+      fetch('/api/v1/users/profile', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.credits !== undefined) {
+            setUserCredits(data.credits);
+            localStorage.setItem('userCredits', String(data.credits));
+          }
+          if (data?.nickname) {
+            setUserInitial(data.nickname.charAt(0).toUpperCase());
+            localStorage.setItem('userNickname', data.nickname);
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -103,6 +136,13 @@ export function DesignHeader() {
                 }
               >
                 <DropdownMenuLabel>我的账户</DropdownMenuLabel>
+                {userCredits !== null && (
+                  <div className="px-3 py-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Coins className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="font-medium">{userCredits}</span>
+                    <span>积分</span>
+                  </div>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => (window.location.href = '/profile')}>
                   <User className="mr-2 h-4 w-4" /> 个人中心
