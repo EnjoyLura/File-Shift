@@ -229,7 +229,9 @@ export default function DesignTasksPage() {
                           {new Date(task.createdAt).toLocaleString('zh-CN')} · {task.creditsCost}{' '}
                           积分
                           {task.status === 'failed' && task.errorMessage && (
-                            <span className="ml-2 text-destructive">({task.errorMessage})</span>
+                            <span className="ml-2 text-destructive break-all">
+                              ({task.errorMessage})
+                            </span>
                           )}
                         </p>
                       </div>
