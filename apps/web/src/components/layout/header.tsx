@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Menu, X, LayoutGrid, History, User, LogOut, ChevronRight } from 'lucide-react';
+import { Zap, Menu, X, LayoutGrid, History, User, LogOut, ChevronRight, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -24,11 +24,16 @@ const NAV_LINKS = [
 export function DesignHeader() {
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userInitial, setUserInitial] = useState('U');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem('accessToken'));
+    const token = localStorage.getItem('accessToken');
+    setIsLoggedIn(!!token);
+    // 尝试从缓存获取昵称首字母
+    const cached = localStorage.getItem('userNickname');
+    if (cached) setUserInitial(cached.charAt(0).toUpperCase());
   }, []);
 
   useEffect(() => {
@@ -92,7 +97,7 @@ export function DesignHeader() {
                 trigger={
                   <button className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-accent">
                     <Avatar size="sm">
-                      <AvatarFallback>U</AvatarFallback>
+                      <AvatarFallback>{userInitial}</AvatarFallback>
                     </Avatar>
                   </button>
                 }
@@ -104,6 +109,11 @@ export function DesignHeader() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => (window.location.href = '/tasks')}>
                   <History className="mr-2 h-4 w-4" /> 转换历史
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => (window.location.href = '/profile?action=changePassword')}
+                >
+                  <Lock className="mr-2 h-4 w-4" /> 修改密码
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

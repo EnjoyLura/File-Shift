@@ -1,30 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
-  User,
-  CreditCard,
   Users,
   ClipboardList,
   Settings,
   LogOut,
   ChevronRight,
   Pencil,
-  Lock,
   Copy,
   CheckCircle2,
   Mail,
   Calendar,
   Shield,
+  Camera,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageTransition } from '@/components/shared/page-transition';
@@ -43,12 +41,21 @@ interface Profile {
   credits: number;
   inviteCode: string;
   inviteCount: number;
+  avatarUrl?: string;
   createdAt: string;
   totalCreditsEarned?: number;
   totalCreditsSpent?: number;
 }
 
 export default function DesignProfilePage() {
+  return (
+    <Suspense>
+      <ProfileContent />
+    </Suspense>
+  );
+}
+
+function ProfileContent() {
   const { isLoggedIn, loading: authLoading, logout } = useAuth(true);
   const { toast } = useToast();
   const { copy, copied } = useClipboard();
@@ -60,6 +67,8 @@ export default function DesignProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -68,6 +77,8 @@ export default function DesignProfilePage() {
         const p = (await getProfile()) as unknown as Profile;
         setProfile(p);
         setNickname(p.nickname || '');
+        // 缓存昵称供header使用
+        if (p.nickname) localStorage.setItem('userNickname', p.nickname);
       } catch {
         /* ignore */
       } finally {
@@ -76,11 +87,19 @@ export default function DesignProfilePage() {
     })();
   }, [isLoggedIn]);
 
+  // 从header跳转过来时自动打开修改密码
+  useEffect(() => {
+    if (searchParams.get('action') === 'changePassword') {
+      setShowPassword(true);
+    }
+  }, [searchParams]);
+
   const handleSaveNickname = async () => {
     try {
       setSaving(true);
       await updateProfile({ nickname });
       setProfile((prev) => (prev ? { ...prev, nickname } : prev));
+      localStorage.setItem('userNickname', nickname);
       setEditing(false);
       toast({ title: '昵称已更新', variant: 'success' });
     } catch (err: unknown) {
@@ -114,6 +133,18 @@ export default function DesignProfilePage() {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // 简单的本地预览 - 后续可接入OSS上传
+    const reader = new FileReader();
+    reader.onload = () => {
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: reader.result as string } : prev));
+    };
+    reader.readAsDataURL(file);
+    toast({ title: '头像已更新', variant: 'success' });
+  };
+
   if (authLoading || !isLoggedIn) return null;
 
   const inviteLink = `https://fileshift.com/register?ref=${profile?.inviteCode || ''}`;
@@ -121,8 +152,6 @@ export default function DesignProfilePage() {
   return (
     <PageTransition>
       <div className="mx-auto max-w-5xl px-4 py-8 md:py-12">
-        <h1 className="text-3xl font-bold tracking-tight mb-8">个人中心</h1>
-
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Skeleton className="h-64 md:col-span-2 rounded-2xl" />
@@ -141,13 +170,49 @@ export default function DesignProfilePage() {
               <Card className="p-6 space-y-5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
-                    <Avatar size="lg">
-                      <AvatarFallback className="text-xl">
-                        {(profile.nickname || 'U').charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
+                    {/* 可点击上传头像 */}
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="relative group"
+                    >
+                      <Avatar size="lg">
+                        {profile.avatarUrl ? (
+                          <img
+                            src={profile.avatarUrl}
+                            alt="头像"
+                            className="h-full w-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <AvatarFallback className="text-xl">
+                            {(profile.nickname || 'U').charAt(0)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="h-4 w-4 text-white" />
+                      </div>
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
+                      />
+                    </button>
                     <div>
-                      <h2 className="text-lg font-bold">{profile.nickname || 'FileShift 用户'}</h2>
+                      <div className="flex items-center gap-1.5">
+                        <h2 className="text-lg font-bold">
+                          {profile.nickname || 'FileShift 用户'}
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => setEditing(!editing)}
+                          className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                       <p className="text-sm text-muted-foreground flex items-center gap-1">
                         <Mail className="h-3.5 w-3.5" /> {profile.email}
                       </p>
@@ -185,19 +250,6 @@ export default function DesignProfilePage() {
                       </div>
                     );
                   })}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setEditing(!editing)}>
-                    <Pencil className="h-3.5 w-3.5" /> {editing ? '取消编辑' : '编辑昵称'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    <Lock className="h-3.5 w-3.5" /> {showPassword ? '收起' : '修改密码'}
-                  </Button>
                 </div>
 
                 <AnimatePresence>
@@ -328,13 +380,17 @@ export default function DesignProfilePage() {
                       href: '/tasks',
                       color: 'text-blue-500 bg-blue-500/10',
                     },
-                    {
-                      icon: Settings,
-                      label: '管理后台',
-                      desc: '系统管理与统计',
-                      href: '/admin',
-                      color: 'text-purple-500 bg-purple-500/10',
-                    },
+                    ...(profile.role === 'admin'
+                      ? [
+                          {
+                            icon: Settings,
+                            label: '管理后台',
+                            desc: '系统管理与统计',
+                            href: '/admin',
+                            color: 'text-purple-500 bg-purple-500/10',
+                          },
+                        ]
+                      : []),
                   ].map((item) => {
                     const Icon = item.icon;
                     return (
