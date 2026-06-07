@@ -202,6 +202,8 @@ export default function DesignConvertTypePage() {
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
     const arr = Array.from(files);
+    // 重置 input 值，确保删除后可以重新上传同一文件
+    if (fileInputRef.current) fileInputRef.current.value = '';
 
     // 文件格式验证
     const acceptValue = TYPE_ACCEPT[conversionType] || '';

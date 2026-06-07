@@ -2,22 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import type { ConversionTask, PaginatedData } from '@fileshift/shared-types';
-import {
-  History,
-  Download,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  FileCheck2,
-  Clock,
-  AlertCircle,
-  Loader2,
-  Inbox,
-} from 'lucide-react';
+import { History, Download, Trash2, ChevronLeft, ChevronRight, Loader2, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -32,16 +20,10 @@ import { PageTransition } from '@/components/shared/page-transition';
 import { useAuth } from '@/components/hooks/use-auth';
 import { getTaskList, authenticatedDownload, deleteTask } from '@/lib/api';
 
-const STATUS_OPTIONS = [
-  { value: '', label: '全部状态' },
-  { value: 'completed', label: '已完成' },
-  { value: 'queued', label: '排队中' },
-  { value: 'processing', label: '处理中' },
-  { value: 'failed', label: '失败' },
-];
+import { cn } from '@/lib/utils';
 
 const TYPE_OPTIONS = [
-  { value: '', label: '全部类型' },
+  { value: '', label: '全部' },
   { value: 'image', label: '图片' },
   { value: 'document', label: '文档' },
   { value: 'pdf', label: 'PDF' },
@@ -101,7 +83,6 @@ export default function DesignTasksPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PaginatedData<ConversionTask> | null>(null);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [downloadingTaskNo, setDownloadingTaskNo] = useState<string | null>(null);
   const [deletingTaskNo, setDeletingTaskNo] = useState<string | null>(null);
@@ -111,20 +92,14 @@ export default function DesignTasksPage() {
   const loadTasks = useCallback(async () => {
     try {
       setLoading(true);
-      const result = await getTaskList(
-        page,
-        20,
-        statusFilter || undefined,
-        undefined,
-        categoryFilter || undefined,
-      );
+      const result = await getTaskList(page, 20, undefined, undefined, categoryFilter || undefined);
       setData(result);
     } catch {
       /* ignore */
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, categoryFilter]);
+  }, [page, categoryFilter]);
 
   useEffect(() => {
     if (isLoggedIn) loadTasks();
@@ -175,26 +150,26 @@ export default function DesignTasksPage() {
           {data && <p className="mt-2 text-sm text-muted-foreground">共 {data.total} 条记录</p>}
         </div>
 
-        {/* Filters */}
-        <div className="mb-6 flex flex-wrap gap-3">
-          <Select
-            options={STATUS_OPTIONS}
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="w-32"
-          />
-          <Select
-            options={TYPE_OPTIONS}
-            value={categoryFilter}
-            onChange={(e) => {
-              setCategoryFilter(e.target.value);
-              setPage(1);
-            }}
-            className="w-32"
-          />
+        {/* Type Filter */}
+        <div className="mb-6 flex items-center gap-2 flex-wrap">
+          {TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                setCategoryFilter(opt.value);
+                setPage(1);
+              }}
+              className={cn(
+                'rounded-full px-4 py-1.5 text-sm font-medium transition-all',
+                categoryFilter === opt.value
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
 
         {/* Loading Skeleton */}
