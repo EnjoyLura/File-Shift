@@ -17,6 +17,7 @@ import {
   Trash2,
   X,
   Sparkles,
+  ZoomIn,
 } from 'lucide-react';
 import { CREDIT_COSTS } from '@fileshift/constants';
 import type { ConversionTaskDetail } from '@fileshift/shared-types';
@@ -26,6 +27,7 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/components/hooks/use-auth';
+import { useToast } from '@/components/ui/toast';
 import { PageTransition } from '@/components/shared/page-transition';
 import {
   uploadFile,
@@ -119,20 +121,6 @@ const TYPE_ACCEPT: Record<string, string> = {
 
 type AppState = 'idle' | 'uploading' | 'converting' | 'completed' | 'error';
 
-const STEPS = [
-  { label: '上传文件', state: 'idle' },
-  { label: '设置参数', state: 'idle' },
-  { label: '转换中', state: 'converting' },
-  { label: '完成', state: 'completed' },
-];
-
-function getStepStatus(state: AppState, idx: number): 'done' | 'active' | 'pending' {
-  if (state === 'completed') return idx < 4 ? 'done' : 'active';
-  if (state === 'converting') return idx < 2 ? 'done' : idx === 2 ? 'active' : 'pending';
-  if (state === 'uploading') return idx < 1 ? 'done' : idx === 1 ? 'active' : 'pending';
-  return idx === 0 ? 'active' : 'pending';
-}
-
 export default function DesignConvertTypePage() {
   const params = useParams();
   const router = useRouter();
@@ -169,6 +157,8 @@ export default function DesignConvertTypePage() {
   const [previews, setPreviews] = useState<
     { url: string; name: string; width: number; height: number; size: number }[]
   >([]);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     return () => {
@@ -212,6 +202,32 @@ export default function DesignConvertTypePage() {
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
     const arr = Array.from(files);
+
+    // 文件格式验证
+    const acceptValue = TYPE_ACCEPT[conversionType] || '';
+    if (acceptValue && acceptValue !== '*') {
+      for (const file of arr) {
+        const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+        const mime = file.type;
+        const allowed = acceptValue.split(',').map((s) => s.trim());
+        const valid = allowed.some((a) => {
+          if (a.endsWith('/*')) {
+            const prefix = a.slice(0, -1);
+            return mime.startsWith(prefix);
+          }
+          return ext === a.toLowerCase();
+        });
+        if (!valid) {
+          toast({
+            title: '文件格式不正确',
+            description: `${file.name} 不支持，请上传 ${acceptValue} 格式的文件`,
+            variant: 'error',
+          });
+          return;
+        }
+      }
+    }
+
     setSelectedFiles(isMultiFile ? (prev) => [...prev, ...arr] : isImageTool ? arr : [arr[0]]);
     setState('idle');
     setError('');
@@ -321,38 +337,6 @@ export default function DesignConvertTypePage() {
           </p>
         </div>
 
-        {/* Step Indicator */}
-        <div className="mb-8 flex items-center gap-2">
-          {STEPS.map((step, i) => {
-            const status = getStepStatus(state, i);
-            return (
-              <div key={step.label} className="flex items-center gap-2 flex-1">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
-                    status === 'done'
-                      ? 'bg-primary text-primary-foreground'
-                      : status === 'active'
-                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
-                        : 'bg-muted text-muted-foreground'
-                  }`}
-                >
-                  {i + 1}
-                </div>
-                <span
-                  className={`text-xs hidden sm:inline ${status === 'active' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}
-                >
-                  {step.label}
-                </span>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={`flex-1 h-px ${status === 'done' ? 'bg-primary' : 'bg-border'}`}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-
         {/* Error */}
         {error && (
           <motion.div
@@ -411,6 +395,26 @@ export default function DesignConvertTypePage() {
                 <p className="text-sm text-muted-foreground mt-1">支持格式: {accept}</p>
               </div>
 
+              {/* Image Preview Zoom Modal */}
+              {zoomImage && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+                  onClick={() => setZoomImage(null)}
+                >
+                  <button
+                    className="absolute top-4 right-4 text-white/80 hover:text-white"
+                    onClick={() => setZoomImage(null)}
+                  >
+                    <X className="h-8 w-8" />
+                  </button>
+                  <img
+                    src={zoomImage}
+                    alt="放大预览"
+                    className="max-w-full max-h-full object-contain rounded-lg"
+                  />
+                </div>
+              )}
+
               {/* Selected Files - 图片工具显示预览卡片 */}
               {selectedFiles.length > 0 && (
                 <div
@@ -433,6 +437,17 @@ export default function DesignConvertTypePage() {
                             </span>
                             <span>{(preview.size / 1024 / 1024).toFixed(2)} MB</span>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-1 right-8 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setZoomImage(preview.url);
+                            }}
+                          >
+                            <ZoomIn className="h-3 w-3" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"

@@ -51,7 +51,7 @@ export function DesignHeader() {
     if (cachedCredits) setUserCredits(Number(cachedCredits));
     // 如果已登录，获取最新积分
     if (token) {
-      fetch('/api/v1/users/profile', {
+      fetch('/api/v1/user/profile', {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((r) => (r.ok ? r.json() : null))
