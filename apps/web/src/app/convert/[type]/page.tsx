@@ -16,12 +16,12 @@ import {
   RotateCcw,
   Trash2,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { CREDIT_COSTS } from '@fileshift/constants';
 import type { ConversionTaskDetail } from '@fileshift/shared-types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -151,9 +151,24 @@ export default function DesignConvertTypePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isMultiFile = ['pdf-merge'].includes(conversionType);
+  const isImageTool =
+    conversionType.startsWith('image') ||
+    [
+      'png-to-jpg',
+      'jpg-to-png',
+      'png-to-webp',
+      'jpg-to-webp',
+      'webp-to-png',
+      'webp-to-jpg',
+    ].includes(conversionType);
   const label = TYPE_LABELS[conversionType] || conversionType;
   const cost = CREDIT_COSTS[conversionType] ?? 1;
   const accept = TYPE_ACCEPT[conversionType] || '*';
+
+  // 图片预览相关状态
+  const [previews, setPreviews] = useState<
+    { url: string; name: string; width: number; height: number; size: number }[]
+  >([]);
 
   useEffect(() => {
     return () => {
@@ -197,11 +212,35 @@ export default function DesignConvertTypePage() {
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
     const arr = Array.from(files);
-    setSelectedFiles(isMultiFile ? (prev) => [...prev, ...arr] : [arr[0]]);
+    setSelectedFiles(isMultiFile ? (prev) => [...prev, ...arr] : isImageTool ? arr : [arr[0]]);
     setState('idle');
     setError('');
     setTaskDetail(null);
     setProgress(0);
+
+    // 图片工具生成预览
+    if (isImageTool) {
+      arr.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new window.Image();
+          img.onload = () => {
+            setPreviews((prev) => [
+              ...prev,
+              {
+                url: e.target?.result as string,
+                name: file.name,
+                width: img.naturalWidth,
+                height: img.naturalHeight,
+                size: file.size,
+              },
+            ]);
+          };
+          img.src = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   };
 
   const handleStart = async () => {
@@ -251,6 +290,7 @@ export default function DesignConvertTypePage() {
     stopPolling();
     setState('idle');
     setSelectedFiles([]);
+    setPreviews([]);
     setTaskNo('');
     setTaskDetail(null);
     setError('');
@@ -274,11 +314,10 @@ export default function DesignConvertTypePage() {
 
         <div className="mb-6">
           <h1 className="text-2xl font-bold">{label}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            消耗{' '}
-            <Badge variant="secondary" className="ml-1">
-              {cost} 积分
-            </Badge>
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-primary fill-primary" />
+            <span className="font-medium">{cost}</span>
+            积分
           </p>
         </div>
 
@@ -359,7 +398,7 @@ export default function DesignConvertTypePage() {
                   ref={fileInputRef}
                   type="file"
                   accept={accept}
-                  multiple={isMultiFile}
+                  multiple={isMultiFile || isImageTool}
                   className="hidden"
                   onChange={(e) => handleFiles(e.target.files)}
                 />
@@ -372,34 +411,66 @@ export default function DesignConvertTypePage() {
                 <p className="text-sm text-muted-foreground mt-1">支持格式: {accept}</p>
               </div>
 
-              {/* Selected Files */}
+              {/* Selected Files - 图片工具显示预览卡片 */}
               {selectedFiles.length > 0 && (
-                <div className="space-y-2">
-                  {selectedFiles.map((file, idx) => (
-                    <Card key={idx} className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <FileUp className="h-5 w-5 text-primary" />
-                          <div>
-                            <p className="text-sm font-medium">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {(file.size / 1024 / 1024).toFixed(2)} MB
-                            </p>
+                <div
+                  className={isImageTool ? 'grid grid-cols-2 sm:grid-cols-3 gap-3' : 'space-y-2'}
+                >
+                  {isImageTool
+                    ? previews.map((preview, idx) => (
+                        <Card key={idx} className="p-3 space-y-2 relative group">
+                          <div className="aspect-square rounded-lg overflow-hidden bg-muted/30">
+                            <img
+                              src={preview.url}
+                              alt={preview.name}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() =>
-                            setSelectedFiles((prev) => prev.filter((_, i) => i !== idx))
-                          }
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    </Card>
-                  ))}
+                          <p className="text-xs font-medium truncate">{preview.name}</p>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              {preview.width}×{preview.height}
+                            </span>
+                            <span>{(preview.size / 1024 / 1024).toFixed(2)} MB</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80"
+                            onClick={() => {
+                              setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+                              setPreviews((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Card>
+                      ))
+                    : selectedFiles.map((file, idx) => (
+                        <Card key={idx} className="p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <FileUp className="h-5 w-5 text-primary" />
+                              <div>
+                                <p className="text-sm font-medium">{file.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() =>
+                                setSelectedFiles((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                            >
+                              <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
                 </div>
               )}
 

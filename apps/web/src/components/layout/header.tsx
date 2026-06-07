@@ -14,7 +14,7 @@ import {
   LogOut,
   ChevronRight,
   Lock,
-  Coins,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -138,7 +138,7 @@ export function DesignHeader() {
                 <DropdownMenuLabel>我的账户</DropdownMenuLabel>
                 {userCredits !== null && (
                   <div className="px-3 py-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Coins className="h-3.5 w-3.5 text-amber-500" />
+                    <Sparkles className="h-3.5 w-3.5 text-primary fill-primary" />
                     <span className="font-medium">{userCredits}</span>
                     <span>积分</span>
                   </div>
