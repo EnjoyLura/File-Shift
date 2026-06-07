@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -11,8 +11,22 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { login } from '@/lib/api';
 import { fadeIn } from '@/components/shared/animations';
+import { cn } from '@/lib/utils';
 
 const highlights = ['34+ 种文件处理工具', '注册即送 50 积分', '秒级转换速度', '文件 24h 自动清理'];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateEmail(v: string): string {
+  if (!v) return '';
+  if (!EMAIL_RE.test(v)) return '请输入有效的邮箱地址';
+  return '';
+}
+
+function validatePassword(v: string): string {
+  if (!v) return '请输入密码';
+  return '';
+}
 
 export default function DesignLoginPage() {
   const router = useRouter();
@@ -21,6 +35,17 @@ export default function DesignLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [touchedEmail, setTouchedEmail] = useState(false);
+  const [touchedPassword, setTouchedPassword] = useState(false);
+
+  const emailError = useMemo(
+    () => (touchedEmail ? validateEmail(email) : ''),
+    [email, touchedEmail],
+  );
+  const passwordError = useMemo(
+    () => (touchedPassword ? validatePassword(password) : ''),
+    [password, touchedPassword],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +118,7 @@ export default function DesignLoginPage() {
         animate="visible"
         className="flex-1 flex items-center justify-center p-6"
       >
-        <Card className="w-full max-w-md border-0 shadow-none md:border md:shadow-sm">
+        <Card className="w-full max-w-md border-0 shadow-none md:border md:shadow-lg">
           <CardHeader className="text-center space-y-2">
             <Link href="/" className="flex items-center justify-center gap-2 mb-2 lg:hidden">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-brand">
@@ -106,12 +131,6 @@ export default function DesignLoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
               <div className="space-y-2">
                 <Label htmlFor="email">邮箱</Label>
                 <div className="relative">
@@ -122,10 +141,15 @@ export default function DesignLoginPage() {
                     placeholder="user@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    onBlur={() => setTouchedEmail(true)}
+                    className={cn(
+                      'pl-10',
+                      emailError && 'border-destructive focus-visible:border-destructive',
+                    )}
                     required
                   />
                 </div>
+                {emailError && <p className="text-xs text-destructive">{emailError}</p>}
               </div>
 
               <div className="space-y-2">
@@ -138,7 +162,11 @@ export default function DesignLoginPage() {
                     placeholder="请输入密码"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
+                    onBlur={() => setTouchedPassword(true)}
+                    className={cn(
+                      'pl-10 pr-10',
+                      passwordError && 'border-destructive focus-visible:border-destructive',
+                    )}
                     required
                   />
                   <button
@@ -149,7 +177,10 @@ export default function DesignLoginPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
               </div>
+
+              {error && <p className="text-xs text-destructive text-center">{error}</p>}
 
               <Button type="submit" disabled={loading} className="w-full" size="lg">
                 {loading ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -19,21 +19,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { register, sendCode } from '@/lib/api';
 import { fadeIn } from '@/components/shared/animations';
+import { cn } from '@/lib/utils';
 
 const highlights = ['34+ 种文件处理工具', '注册即送 50 积分', '秒级转换速度', '邀请好友再送积分'];
 
-function getPasswordStrength(pw: string): { score: number; label: string } {
-  let score = 0;
-  if (pw.length >= 6) score++;
-  if (pw.length >= 10) score++;
-  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
-  if (/\d/.test(pw)) score++;
-  if (/[^a-zA-Z0-9]/.test(pw)) score++;
-  const labels = ['极弱', '弱', '一般', '较强', '强', '非常强'];
-  return { score: Math.min(score, 5), label: labels[Math.min(score, 5)] };
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateEmail(v: string): string {
+  if (!v) return '';
+  if (!EMAIL_RE.test(v)) return '请输入有效的邮箱地址';
+  return '';
+}
+
+function validatePassword(v: string): string {
+  if (!v) return '';
+  if (v.length < 6) return '密码至少需要 6 位';
+  if (!/[A-Za-z]/.test(v)) return '密码须包含字母';
+  if (!/\d/.test(v)) return '密码须包含数字';
+  return '';
 }
 
 export default function DesignRegisterPage() {
@@ -49,8 +54,17 @@ export default function DesignRegisterPage() {
   const [devCode, setDevCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [touchedEmail, setTouchedEmail] = useState(false);
+  const [touchedPassword, setTouchedPassword] = useState(false);
 
-  const strength = getPasswordStrength(password);
+  const emailError = useMemo(
+    () => (touchedEmail ? validateEmail(email) : ''),
+    [email, touchedEmail],
+  );
+  const passwordError = useMemo(
+    () => (touchedPassword ? validatePassword(password) : ''),
+    [password, touchedPassword],
+  );
 
   const handleSendCode = useCallback(async () => {
     if (!email || countdown > 0) return;
@@ -145,7 +159,7 @@ export default function DesignRegisterPage() {
         animate="visible"
         className="flex-1 flex items-center justify-center p-6"
       >
-        <Card className="w-full max-w-md border-0 shadow-none md:border md:shadow-sm">
+        <Card className="w-full max-w-md border-0 shadow-none md:border md:shadow-lg">
           <CardHeader className="text-center space-y-2">
             <Link href="/" className="flex items-center justify-center gap-2 mb-2 lg:hidden">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-brand">
@@ -158,12 +172,6 @@ export default function DesignRegisterPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
               <div className="space-y-2">
                 <Label htmlFor="email">邮箱</Label>
                 <div className="relative">
@@ -174,10 +182,15 @@ export default function DesignRegisterPage() {
                     placeholder="user@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    onBlur={() => setTouchedEmail(true)}
+                    className={cn(
+                      'pl-10',
+                      emailError && 'border-destructive focus-visible:border-destructive',
+                    )}
                     required
                   />
                 </div>
+                {emailError && <p className="text-xs text-destructive">{emailError}</p>}
               </div>
 
               <div className="space-y-2">
@@ -222,7 +235,11 @@ export default function DesignRegisterPage() {
                     placeholder="至少6位，含字母和数字"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
+                    onBlur={() => setTouchedPassword(true)}
+                    className={cn(
+                      'pl-10 pr-10',
+                      passwordError && 'border-destructive focus-visible:border-destructive',
+                    )}
                     minLength={6}
                     required
                   />
@@ -234,16 +251,7 @@ export default function DesignRegisterPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {password.length > 0 && (
-                  <div className="space-y-1">
-                    <Progress
-                      value={strength.score}
-                      max={5}
-                      variant={strength.score >= 3 ? 'success' : 'default'}
-                    />
-                    <p className="text-xs text-muted-foreground">密码强度: {strength.label}</p>
-                  </div>
-                )}
+                {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
               </div>
 
               {/* Invite Code - collapsible */}
@@ -269,6 +277,8 @@ export default function DesignRegisterPage() {
                   </motion.div>
                 )}
               </div>
+
+              {error && <p className="text-xs text-destructive text-center">{error}</p>}
 
               <Button type="submit" disabled={loading} className="w-full" size="lg">
                 {loading ? (
