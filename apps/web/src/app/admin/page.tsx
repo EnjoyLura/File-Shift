@@ -1,8 +1,40 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { Header } from '@/components/layout/header';
+import {
+  Users,
+  FileCheck2,
+  Clock,
+  UserPlus,
+  CreditCard,
+  Activity,
+  Shield,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Ban,
+  CheckCircle2,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { AnimatedCounter } from '@/components/shared/animated-counter';
+import { PageTransition } from '@/components/shared/page-transition';
+import { useAuth } from '@/components/hooks/use-auth';
+import { useDebounce } from '@/components/hooks/use-debounce';
+import { useToast } from '@/components/ui/toast';
 import {
   getProfile,
   getAdminStats,
@@ -22,7 +54,6 @@ interface Stats {
   todayTasks: number;
   totalCreditsSpent: number;
 }
-
 interface AdminUser {
   id: number;
   email: string | null;
@@ -36,7 +67,6 @@ interface AdminUser {
   lastLoginAt: string | null;
   createdAt: string;
 }
-
 interface AdminTask {
   id: number;
   taskNo: string;
@@ -48,381 +78,445 @@ interface AdminTask {
   createdAt: string;
 }
 
-export default function AdminPage() {
-  const router = useRouter();
-  const [isLoaded, setIsLoaded] = useState(false);
+export default function DesignAdminPage() {
+  const { isLoggedIn, loading: authLoading } = useAuth(true);
+  const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tasks'>('overview');
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [usersTotal, setUsersTotal] = useState(0);
-  const [usersPage, setUsersPage] = useState(1);
-  const [userSearch, setUserSearch] = useState('');
   const [tasks, setTasks] = useState<AdminTask[]>([]);
-  const [tasksTotal, setTasksTotal] = useState(0);
-  const [tasksPage, setTasksPage] = useState(1);
-  const [adjustUserId, setAdjustUserId] = useState<number | null>(null);
-  const [adjustAmount, setAdjustAmount] = useState('');
-  const [adjustReason, setAdjustReason] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [userPage, setUserPage] = useState(1);
+  const [taskPage, setTaskPage] = useState(1);
+  const [userTotal, setUserTotal] = useState(0);
+  const [taskTotal, setTaskTotal] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery);
+  const [creditsDialog, setCreditsDialog] = useState<{ open: boolean; user: AdminUser | null }>({
+    open: false,
+    user: null,
+  });
+  const [creditsAmount, setCreditsAmount] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    getProfile()
-      .then((p) => {
-        if (p.role !== 'admin') {
-          alert('需要管理员权限');
-          router.push('/');
-          return;
-        }
+    if (!isLoggedIn) return;
+    (async () => {
+      try {
+        const p = await getProfile();
+        if ((p as { role: string }).role !== 'admin') return;
         setIsAdmin(true);
-      })
-      .catch(() => {
-        router.push('/login');
-      });
-  }, [router]);
-
-  const loadStats = useCallback(async () => {
-    try {
-      const s = await getAdminStats();
-      setStats(s);
-    } catch {
-      // ignore
-    }
-  }, []);
+        const s = await getAdminStats();
+        setStats(s as Stats);
+      } catch {
+        /* not admin */
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [isLoggedIn]);
 
   const loadUsers = useCallback(async () => {
     try {
-      const result = await getAdminUsers(usersPage, 20, userSearch || undefined);
-      setUsers(result.list);
-      setUsersTotal(result.total);
+      const r = await getAdminUsers(userPage, 20, debouncedSearch || undefined);
+      setUsers(r.list as AdminUser[]);
+      setUserTotal(r.total);
     } catch {
-      // ignore
+      /* ignore */
     }
-  }, [usersPage, userSearch]);
+  }, [userPage, debouncedSearch]);
 
   const loadTasks = useCallback(async () => {
     try {
-      const result = await getAdminTasks(tasksPage, 20);
-      setTasks(result.list);
-      setTasksTotal(result.total);
+      const r = await getAdminTasks(taskPage, 20);
+      setTasks(r.list as AdminTask[]);
+      setTaskTotal(r.total);
     } catch {
-      // ignore
+      /* ignore */
     }
-  }, [tasksPage]);
+  }, [taskPage]);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    setIsLoaded(true);
-    if (activeTab === 'overview') loadStats();
-    if (activeTab === 'users') loadUsers();
-    if (activeTab === 'tasks') loadTasks();
-  }, [isAdmin, activeTab, loadStats, loadUsers, loadTasks]);
+    if (isAdmin) loadUsers();
+  }, [isAdmin, loadUsers]);
+  useEffect(() => {
+    if (isAdmin) loadTasks();
+  }, [isAdmin, loadTasks]);
 
-  const handleToggleStatus = async (userId: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
-    if (!confirm(`确定要${newStatus === 'active' ? '启用' : '禁用'}该用户吗？`)) return;
+  const handleToggleStatus = async (user: AdminUser) => {
     try {
-      await updateAdminUserStatus(userId, newStatus);
-      await loadUsers();
+      await updateAdminUserStatus(user.id, user.status === 'active' ? 'disabled' : 'active');
+      toast({ title: `已${user.status === 'active' ? '禁用' : '启用'}用户`, variant: 'success' });
+      loadUsers();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : '操作失败');
+      toast({
+        title: '操作失败',
+        description: err instanceof Error ? err.message : '',
+        variant: 'error',
+      });
     }
   };
 
-  const handleAdjustCredits = async (userId: number) => {
-    const amount = parseInt(adjustAmount);
-    if (isNaN(amount) || amount === 0) {
-      alert('请输入有效的积分数量');
-      return;
-    }
+  const handleUpdateCredits = async () => {
+    if (!creditsDialog.user || !creditsAmount) return;
     try {
-      const result = await updateAdminUserCredits(userId, amount, adjustReason || undefined);
-      alert(result.message);
-      setAdjustUserId(null);
-      setAdjustAmount('');
-      setAdjustReason('');
-      await loadUsers();
+      await updateAdminUserCredits(creditsDialog.user.id, Number(creditsAmount));
+      toast({ title: '积分已更新', variant: 'success' });
+      setCreditsDialog({ open: false, user: null });
+      setCreditsAmount('');
+      loadUsers();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : '操作失败');
+      toast({
+        title: '操作失败',
+        description: err instanceof Error ? err.message : '',
+        variant: 'error',
+      });
     }
   };
 
-  if (!isLoaded || !isAdmin) return null;
+  if (authLoading || !isLoggedIn) return null;
+  if (!loading && !isAdmin)
+    return (
+      <PageTransition>
+        <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+          <h1 className="text-2xl font-bold">无权访问</h1>
+          <p className="mt-2 text-muted-foreground">此页面仅管理员可访问</p>
+        </div>
+      </PageTransition>
+    );
+
+  const statCards = stats
+    ? [
+        {
+          icon: Users,
+          label: '总用户',
+          value: stats.totalUsers,
+          color: 'from-blue-500 to-indigo-500',
+        },
+        {
+          icon: UserPlus,
+          label: '今日新增',
+          value: stats.todayUsers,
+          color: 'from-emerald-500 to-green-500',
+        },
+        {
+          icon: FileCheck2,
+          label: '总任务',
+          value: stats.totalTasks,
+          color: 'from-violet-500 to-purple-500',
+        },
+        {
+          icon: Clock,
+          label: '今日任务',
+          value: stats.todayTasks,
+          color: 'from-amber-500 to-orange-500',
+        },
+        {
+          icon: CreditCard,
+          label: '总积分消耗',
+          value: stats.totalCreditsSpent,
+          color: 'from-pink-500 to-rose-500',
+        },
+        {
+          icon: Activity,
+          label: '排队中',
+          value: stats.queuedTasks,
+          color: 'from-cyan-500 to-teal-500',
+        },
+      ]
+    : [];
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="mb-6 text-2xl font-bold">管理后台</h1>
-
-        {/* Tab 切换 */}
-        <div className="mb-6 flex gap-1 rounded-lg border p-1">
-          {(['overview', 'users', 'tasks'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
-                activeTab === tab ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
-              }`}
-            >
-              {tab === 'overview' ? '系统总览' : tab === 'users' ? '用户管理' : '任务记录'}
-            </button>
-          ))}
+    <PageTransition>
+      <div className="mx-auto max-w-6xl px-4 py-8 md:py-12">
+        <div className="mb-8 flex items-center gap-3">
+          <Shield className="h-7 w-7 text-primary" />
+          <h1 className="text-3xl font-bold tracking-tight">管理后台</h1>
         </div>
 
-        {/* 系统总览 */}
-        {activeTab === 'overview' && stats && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[
-                { label: '总用户数', value: stats.totalUsers, color: 'text-blue-600' },
-                { label: '今日新增用户', value: stats.todayUsers, color: 'text-green-600' },
-                { label: '总任务数', value: stats.totalTasks, color: 'text-purple-600' },
-                { label: '今日任务数', value: stats.todayTasks, color: 'text-orange-600' },
-                { label: '已完成任务', value: stats.completedTasks, color: 'text-green-600' },
-                { label: '失败任务', value: stats.failedTasks, color: 'text-destructive' },
-                { label: '队列中任务', value: stats.queuedTasks, color: 'text-yellow-600' },
-                { label: '总积分消费', value: stats.totalCreditsSpent, color: 'text-primary' },
-              ].map((item) => (
-                <div key={item.label} className="rounded-lg border p-4">
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
-                  <p className={`mt-1 text-2xl font-bold ${item.color}`}>{item.value}</p>
-                </div>
-              ))}
-            </div>
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 rounded-2xl" />
+            ))}
           </div>
+        ) : (
+          <Tabs defaultValue="overview">
+            <TabsList variant="underline" className="mb-6">
+              <TabsTrigger value="overview" variant="underline">
+                系统总览
+              </TabsTrigger>
+              <TabsTrigger value="users" variant="underline">
+                用户管理
+              </TabsTrigger>
+              <TabsTrigger value="tasks" variant="underline">
+                任务记录
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Overview Tab */}
+            <TabsContent value="overview">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {statCards.map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <Card key={card.label} className="p-5 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div
+                          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center`}
+                        >
+                          <Icon className="h-5 w-5 text-white" />
+                        </div>
+                        <span className="text-sm text-muted-foreground">{card.label}</span>
+                      </div>
+                      <p className="text-3xl font-bold">
+                        <AnimatedCounter target={card.value} duration={1200} />
+                      </p>
+                    </Card>
+                  );
+                })}
+              </div>
+            </TabsContent>
+
+            {/* Users Tab */}
+            <TabsContent value="users">
+              <div className="mb-4 relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="搜索用户..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setUserPage(1);
+                  }}
+                  className="pl-10"
+                />
+              </div>
+              <Card className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30">
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                          ID
+                        </th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                          邮箱
+                        </th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                          角色
+                        </th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                          状态
+                        </th>
+                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">
+                          积分
+                        </th>
+                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">
+                          操作
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr
+                          key={user.id}
+                          className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
+                        >
+                          <td className="px-4 py-3 text-muted-foreground">{user.id}</td>
+                          <td className="px-4 py-3">{user.email || '—'}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                              {user.role}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant={user.status === 'active' ? 'success' : 'destructive'}>
+                              {user.status === 'active' ? '正常' : '禁用'}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium">
+                            {user.creditsBalance}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => setCreditsDialog({ open: true, user })}
+                              >
+                                <CreditCard className="h-3.5 w-3.5" /> 积分
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => handleToggleStatus(user)}
+                              >
+                                {user.status === 'active' ? (
+                                  <Ban className="h-3.5 w-3.5 text-destructive" />
+                                ) : (
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                                )}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+              {userTotal > 20 && (
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={userPage <= 1}
+                    onClick={() => setUserPage((p) => p - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {userPage} / {Math.ceil(userTotal / 20)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={userPage >= Math.ceil(userTotal / 20)}
+                    onClick={() => setUserPage((p) => p + 1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Tasks Tab */}
+            <TabsContent value="tasks">
+              <Card className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30">
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                          任务号
+                        </th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                          用户
+                        </th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                          类型
+                        </th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">
+                          状态
+                        </th>
+                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">
+                          积分
+                        </th>
+                        <th className="text-right px-4 py-3 font-medium text-muted-foreground">
+                          时间
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tasks.map((task) => (
+                        <tr
+                          key={task.id}
+                          className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
+                        >
+                          <td className="px-4 py-3 font-mono text-xs">
+                            {task.taskNo.slice(0, 8)}...
+                          </td>
+                          <td className="px-4 py-3">#{task.userId}</td>
+                          <td className="px-4 py-3">{task.type}</td>
+                          <td className="px-4 py-3">
+                            <Badge
+                              variant={
+                                task.status === 'completed'
+                                  ? 'success'
+                                  : task.status === 'failed'
+                                    ? 'destructive'
+                                    : task.status === 'processing'
+                                      ? 'default'
+                                      : 'secondary'
+                              }
+                            >
+                              {task.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right">{task.creditsCost}</td>
+                          <td className="px-4 py-3 text-right text-muted-foreground text-xs">
+                            {new Date(task.createdAt).toLocaleString('zh-CN')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+              {taskTotal > 20 && (
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={taskPage <= 1}
+                    onClick={() => setTaskPage((p) => p - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {taskPage} / {Math.ceil(taskTotal / 20)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={taskPage >= Math.ceil(taskTotal / 20)}
+                    onClick={() => setTaskPage((p) => p + 1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         )}
 
-        {/* 用户管理 */}
-        {activeTab === 'users' && (
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="搜索邮箱或昵称..."
-                value={userSearch}
-                onChange={(e) => {
-                  setUserSearch(e.target.value);
-                  setUsersPage(1);
-                }}
-                className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        {/* Credits Dialog */}
+        <Dialog
+          open={creditsDialog.open}
+          onOpenChange={(open) =>
+            setCreditsDialog({ open, user: open ? creditsDialog.user : null })
+          }
+        >
+          <DialogContent onClose={() => setCreditsDialog({ open: false, user: null })}>
+            <DialogHeader>
+              <DialogTitle>调整积分</DialogTitle>
+              <DialogDescription>为用户 {creditsDialog.user?.email} 调整积分余额</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 mt-4">
+              <Label>积分变动量 (正数增加，负数减少)</Label>
+              <Input
+                type="number"
+                value={creditsAmount}
+                onChange={(e) => setCreditsAmount(e.target.value)}
+                placeholder="例如: 10 或 -5"
               />
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 pr-4">ID</th>
-                    <th className="pb-2 pr-4">邮箱</th>
-                    <th className="pb-2 pr-4">昵称</th>
-                    <th className="pb-2 pr-4">角色</th>
-                    <th className="pb-2 pr-4">状态</th>
-                    <th className="pb-2 pr-4">积分</th>
-                    <th className="pb-2 pr-4">注册时间</th>
-                    <th className="pb-2">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">{u.id}</td>
-                      <td className="py-2 pr-4 text-xs">{u.email || '-'}</td>
-                      <td className="py-2 pr-4">{u.nickname || '-'}</td>
-                      <td className="py-2 pr-4">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100'}`}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs ${u.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
-                        >
-                          {u.status === 'active' ? '正常' : '禁用'}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-4 text-xs">{u.creditsBalance}</td>
-                      <td className="py-2 pr-4 text-xs">
-                        {new Date(u.createdAt).toLocaleDateString('zh-CN')}
-                      </td>
-                      <td className="py-2">
-                        <div className="flex gap-1">
-                          {u.role !== 'admin' && (
-                            <button
-                              onClick={() => handleToggleStatus(u.id, u.status)}
-                              className={`rounded px-2 py-1 text-xs ${
-                                u.status === 'active'
-                                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                                  : 'bg-green-50 text-green-600 hover:bg-green-100'
-                              }`}
-                            >
-                              {u.status === 'active' ? '禁用' : '启用'}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setAdjustUserId(u.id)}
-                            className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-600 hover:bg-blue-100"
-                          >
-                            调积分
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 积分调整弹窗 */}
-            {adjustUserId !== null && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="w-80 rounded-lg bg-background p-6 shadow-lg">
-                  <h3 className="mb-4 font-semibold">调整积分 - 用户 #{adjustUserId}</h3>
-                  <div className="mb-3">
-                    <label className="mb-1 block text-xs text-muted-foreground">积分数量</label>
-                    <input
-                      type="number"
-                      value={adjustAmount}
-                      onChange={(e) => setAdjustAmount(e.target.value)}
-                      placeholder="正数增加，负数扣减"
-                      className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <div className="mb-4">
-                    <label className="mb-1 block text-xs text-muted-foreground">原因</label>
-                    <input
-                      type="text"
-                      value={adjustReason}
-                      onChange={(e) => setAdjustReason(e.target.value)}
-                      placeholder="可选"
-                      className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleAdjustCredits(adjustUserId)}
-                      className="flex-1 rounded-md bg-primary py-2 text-sm text-primary-foreground hover:bg-primary/90"
-                    >
-                      确认
-                    </button>
-                    <button
-                      onClick={() => {
-                        setAdjustUserId(null);
-                        setAdjustAmount('');
-                        setAdjustReason('');
-                      }}
-                      className="flex-1 rounded-md border py-2 text-sm hover:bg-accent"
-                    >
-                      取消
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 分页 */}
-            {usersTotal > 20 && (
-              <div className="flex items-center justify-center gap-2">
-                <button
-                  onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
-                  disabled={usersPage <= 1}
-                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-                >
-                  上一页
-                </button>
-                <span className="text-sm text-muted-foreground">
-                  {usersPage} / {Math.ceil(usersTotal / 20)}
-                </span>
-                <button
-                  onClick={() => setUsersPage((p) => p + 1)}
-                  disabled={usersPage >= Math.ceil(usersTotal / 20)}
-                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-                >
-                  下一页
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 任务记录 */}
-        {activeTab === 'tasks' && (
-          <div className="space-y-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 pr-4">任务号</th>
-                    <th className="pb-2 pr-4">用户ID</th>
-                    <th className="pb-2 pr-4">类型</th>
-                    <th className="pb-2 pr-4">状态</th>
-                    <th className="pb-2 pr-4">文件名</th>
-                    <th className="pb-2 pr-4">积分</th>
-                    <th className="pb-2">创建时间</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tasks.map((t) => (
-                    <tr key={t.taskNo} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-mono text-xs">{t.taskNo}</td>
-                      <td className="py-2 pr-4">{t.userId}</td>
-                      <td className="py-2 pr-4 text-xs">{t.type}</td>
-                      <td className="py-2 pr-4">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs ${
-                            t.status === 'completed'
-                              ? 'bg-green-100 text-green-700'
-                              : t.status === 'failed'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-yellow-100 text-yellow-700'
-                          }`}
-                        >
-                          {t.status}
-                        </span>
-                      </td>
-                      <td className="max-w-[200px] truncate py-2 pr-4 text-xs">
-                        {t.inputFileName || '-'}
-                      </td>
-                      <td className="py-2 pr-4 text-xs">{t.creditsCost}</td>
-                      <td className="py-2 text-xs">
-                        {new Date(t.createdAt).toLocaleString('zh-CN')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 分页 */}
-            {tasksTotal > 20 && (
-              <div className="flex items-center justify-center gap-2">
-                <button
-                  onClick={() => setTasksPage((p) => Math.max(1, p - 1))}
-                  disabled={tasksPage <= 1}
-                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-                >
-                  上一页
-                </button>
-                <span className="text-sm text-muted-foreground">
-                  {tasksPage} / {Math.ceil(tasksTotal / 20)}
-                </span>
-                <button
-                  onClick={() => setTasksPage((p) => p + 1)}
-                  disabled={tasksPage >= Math.ceil(tasksTotal / 20)}
-                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-                >
-                  下一页
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setCreditsDialog({ open: false, user: null })}
+              >
+                取消
+              </Button>
+              <Button onClick={handleUpdateCredits} disabled={!creditsAmount}>
+                确认
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </PageTransition>
   );
 }

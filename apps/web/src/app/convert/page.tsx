@@ -1,16 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+import {
+  Search,
+  Image,
+  FileText,
+  Video,
+  BookOpen,
+  Scissors,
+  Music,
+  Film,
+  Sparkles,
+} from 'lucide-react';
 import { CREDIT_COSTS } from '@fileshift/constants';
-import { Header } from '@/components/layout/header';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { EmptyState } from '@/components/shared/empty-state';
+import { useAuth } from '@/components/hooks/use-auth';
+import { useDebounce } from '@/components/hooks/use-debounce';
+import { stagger, fadeUp } from '@/components/shared/animations';
+import { PageTransition } from '@/components/shared/page-transition';
 
-/** 转换工具分类配置 */
 const TOOL_GROUPS = [
   {
     title: '图片转换',
-    icon: '🖼️',
+    icon: Image,
+    category: 'image',
     tools: [
       { type: 'png-to-jpg', label: 'PNG → JPG' },
       { type: 'jpg-to-png', label: 'JPG → PNG' },
@@ -23,7 +41,8 @@ const TOOL_GROUPS = [
   },
   {
     title: '图片工具',
-    icon: '✂️',
+    icon: Scissors,
+    category: 'image',
     tools: [
       { type: 'image-crop', label: '图片裁剪' },
       { type: 'image-rotate', label: '图片旋转' },
@@ -33,7 +52,8 @@ const TOOL_GROUPS = [
   },
   {
     title: '文档转换',
-    icon: '📄',
+    icon: FileText,
+    category: 'document',
     tools: [
       { type: 'pdf-to-word', label: 'PDF → Word' },
       { type: 'word-to-pdf', label: 'Word → PDF' },
@@ -46,7 +66,8 @@ const TOOL_GROUPS = [
   },
   {
     title: 'PDF 工具',
-    icon: '📑',
+    icon: BookOpen,
+    category: 'document',
     tools: [
       { type: 'pdf-merge', label: 'PDF 合并' },
       { type: 'pdf-split', label: 'PDF 拆分' },
@@ -56,7 +77,8 @@ const TOOL_GROUPS = [
   },
   {
     title: '视频转换',
-    icon: '🎬',
+    icon: Video,
+    category: 'media',
     tools: [
       { type: 'video-to-mp4', label: '视频 → MP4' },
       { type: 'video-to-avi', label: '视频 → AVI' },
@@ -67,7 +89,8 @@ const TOOL_GROUPS = [
   },
   {
     title: '音频转换',
-    icon: '🎵',
+    icon: Music,
+    category: 'media',
     tools: [
       { type: 'audio-to-mp3', label: '音频 → MP3' },
       { type: 'audio-to-wav', label: '音频 → WAV' },
@@ -78,7 +101,8 @@ const TOOL_GROUPS = [
   },
   {
     title: '音视频工具',
-    icon: '🎞️',
+    icon: Film,
+    category: 'media',
     tools: [
       { type: 'video-extract-audio', label: '提取音频' },
       { type: 'video-trim', label: '视频裁剪' },
@@ -90,51 +114,131 @@ const TOOL_GROUPS = [
   },
 ];
 
-export default function ConvertPage() {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+const CATEGORIES = [
+  { value: 'all', label: '全部' },
+  { value: 'image', label: '图片' },
+  { value: 'document', label: '文档' },
+  { value: 'media', label: '音视频' },
+];
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    setIsLoggedIn(true);
-  }, [router]);
+const groupColors = [
+  'from-emerald-500 to-green-500',
+  'from-cyan-500 to-teal-500',
+  'from-rose-500 to-pink-500',
+  'from-amber-500 to-orange-500',
+  'from-violet-500 to-purple-500',
+  'from-indigo-500 to-blue-500',
+  'from-pink-500 to-rose-500',
+];
 
-  if (!isLoggedIn) return null;
+export default function DesignConvertPage() {
+  const { isLoggedIn, loading } = useAuth(true);
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
+  const debouncedSearch = useDebounce(search);
+
+  if (loading || !isLoggedIn) return null;
+
+  const filteredGroups = TOOL_GROUPS.filter(
+    (g) => activeCategory === 'all' || g.category === activeCategory,
+  )
+    .map((g) => ({
+      ...g,
+      tools: g.tools.filter(
+        (t) => !debouncedSearch || t.label.toLowerCase().includes(debouncedSearch.toLowerCase()),
+      ),
+    }))
+    .filter((g) => g.tools.length > 0);
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="mb-2 text-2xl font-bold">转换中心</h1>
-        <p className="mb-8 text-muted-foreground">选择需要的转换类型，上传文件即可开始转换</p>
+    <PageTransition>
+      <div className="mx-auto max-w-6xl px-4 py-8 md:py-12">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Sparkles className="h-7 w-7 text-primary" />
+            转换中心
+          </h1>
+          <p className="mt-2 text-muted-foreground">选择需要的转换类型，上传文件即可开始转换</p>
+        </div>
 
-        {TOOL_GROUPS.map((group) => (
-          <section key={group.title} className="mb-10">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-              <span>{group.icon}</span>
-              {group.title}
-            </h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {group.tools.map((tool) => (
-                <Link
-                  key={tool.type}
-                  href={`/convert/${tool.type}`}
-                  className="group rounded-lg border p-4 transition-all hover:border-primary hover:shadow-sm"
-                >
-                  <p className="mb-1 text-sm font-medium group-hover:text-primary">{tool.label}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {CREDIT_COSTS[tool.type] ?? 1} 积分
-                  </p>
-                </Link>
+        {/* Search + Filter */}
+        <div className="mb-8 flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="搜索工具..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Tabs value={activeCategory} onValueChange={setActiveCategory}>
+            <TabsList variant="pills">
+              {CATEGORIES.map((cat) => (
+                <TabsTrigger key={cat.value} value={cat.value} variant="pills">
+                  {cat.label}
+                </TabsTrigger>
               ))}
-            </div>
-          </section>
-        ))}
-      </main>
-    </div>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {/* Tool Groups */}
+        {filteredGroups.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title="没有找到匹配的工具"
+            description="尝试使用不同的关键词或清除筛选"
+          />
+        ) : (
+          <div className="space-y-10">
+            {filteredGroups.map((group, gi) => {
+              const Icon = group.icon;
+              const color = groupColors[gi % groupColors.length];
+              return (
+                <section key={group.title}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className={`w-9 h-9 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center`}
+                    >
+                      <Icon className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-lg font-semibold">{group.title}</h2>
+                    <Badge variant="secondary">{group.tools.length}</Badge>
+                  </div>
+                  <motion.div
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: '-30px' }}
+                    variants={stagger}
+                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
+                  >
+                    {group.tools.map((tool) => (
+                      <motion.div key={tool.type} variants={fadeUp}>
+                        <Link
+                          href={`/convert/${tool.type}`}
+                          className="group block rounded-xl border border-border bg-background p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30"
+                        >
+                          <p className="font-medium text-sm group-hover:text-primary transition-colors">
+                            {tool.label}
+                          </p>
+                          <div className="mt-2 flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground">
+                              {CREDIT_COSTS[tool.type] ?? 1}
+                            </span>
+                            <span className="text-xs text-muted-foreground">积分</span>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </PageTransition>
   );
 }

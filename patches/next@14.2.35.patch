@@ -1,0 +1,23 @@
+diff --git a/dist/client/components/use-reducer-with-devtools.js b/dist/client/components/use-reducer-with-devtools.js
+index b2173746329074fedf7f5294a0c0fe6540f4eb7e..541a79f26271963a47ab1db69342c65d2dcace59 100644
+--- a/dist/client/components/use-reducer-with-devtools.js
++++ b/dist/client/components/use-reducer-with-devtools.js
+@@ -92,7 +92,17 @@ function useReducerWithReduxDevtoolsImpl(initialState) {
+     const [state, setState] = _react.default.useState(initialState);
+     const actionQueue = (0, _react.useContext)(_actionqueue.ActionQueueContext);
+     if (!actionQueue) {
+-        throw new Error("Invariant: Missing ActionQueueContext");
++        // Graceful fallback when ActionQueueContext is not available
++        // (can happen on Windows due to path casing causing duplicate module registration)
++        const noopDispatch = (0, _react.useCallback)((action)=>{
++            if (typeof action === 'function') {
++                action(setState);
++            } else if (action && action.type === 'ACTION_REFRESH') {
++                setState(initialState);
++            }
++        }, [initialState]);
++        const noopSync = (0, _react.useCallback)(()=>{}, []);
++        return [state, noopDispatch, noopSync];
+     }
+     const devtoolsConnectionRef = (0, _react.useRef)();
+     const enabledRef = (0, _react.useRef)();

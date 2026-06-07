@@ -1,55 +1,223 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Zap, Menu, X, LayoutGrid, History, User, LogOut, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/shared/theme-toggle';
+import { cn } from '@/lib/utils';
 
-export function Header() {
+const NAV_LINKS = [
+  { href: '/convert', label: '转换中心', icon: LayoutGrid },
+  { href: '/tasks', label: '转换历史', icon: History },
+];
+
+export function DesignHeader() {
+  const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     setIsLoggedIn(!!localStorage.getItem('accessToken'));
   }, []);
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
   return (
-    <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="text-lg font-bold text-primary">
-            FileShift
-          </Link>
-          {isLoggedIn && (
-            <div className="flex items-center gap-4 text-sm">
-              <Link href="/convert" className="text-muted-foreground hover:text-primary">
-                转换中心
-              </Link>
-              <Link href="/tasks" className="text-muted-foreground hover:text-primary">
-                转换历史
-              </Link>
+    <>
+      <header
+        className={cn(
+          'sticky top-0 z-40 w-full transition-all duration-300',
+          scrolled
+            ? 'border-b border-border/60 bg-background/80 backdrop-blur-md shadow-sm'
+            : 'bg-transparent',
+        )}
+      >
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-brand">
+              <Zap className="h-4 w-4 text-white" />
             </div>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {isLoggedIn ? (
-            <>
-              <Link href="/profile" className="text-sm text-muted-foreground hover:text-primary">
-                个人中心
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/login" className="text-sm text-muted-foreground hover:text-primary">
-                登录
-              </Link>
-              <Link
-                href="/register"
-                className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90"
+            <span className="text-lg font-bold gradient-text">FileShift</span>
+          </Link>
+
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {NAV_LINKS.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname.startsWith(link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'text-primary bg-primary/5'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Right Side */}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+
+            {isLoggedIn ? (
+              <DropdownMenu
+                trigger={
+                  <button className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-accent">
+                    <Avatar size="sm">
+                      <AvatarFallback>U</AvatarFallback>
+                    </Avatar>
+                  </button>
+                }
               >
-                注册
-              </Link>
-            </>
-          )}
+                <DropdownMenuLabel>我的账户</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => (window.location.href = '/profile')}>
+                  <User className="mr-2 h-4 w-4" /> 个人中心
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => (window.location.href = '/tasks')}>
+                  <History className="mr-2 h-4 w-4" /> 转换历史
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => {
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refreshToken');
+                    window.location.href = '/';
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" /> 退出登录
+                </DropdownMenuItem>
+              </DropdownMenu>
+            ) : (
+              <div className="hidden md:flex items-center gap-2">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/login">登录</Link>
+                </Button>
+                <Button variant="brand" size="sm" asChild>
+                  <Link href="/register">免费注册</Link>
+                </Button>
+              </div>
+            )}
+
+            {/* Mobile hamburger */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-9 w-9"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
         </div>
-      </div>
-    </nav>
+      </header>
+
+      {/* Mobile drawer */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm md:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className="fixed right-0 top-0 z-50 h-full w-72 border-l border-border bg-background p-6 md:hidden"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <span className="text-lg font-bold gradient-text">FileShift</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <nav className="space-y-1">
+                {NAV_LINKS.map((link) => {
+                  const Icon = link.icon;
+                  const isActive = pathname.startsWith(link.href);
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'text-primary bg-primary/5'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {link.label}
+                      <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+                    </Link>
+                  );
+                })}
+                {isLoggedIn && (
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  >
+                    <User className="h-4 w-4" />
+                    个人中心
+                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+                  </Link>
+                )}
+              </nav>
+
+              {!isLoggedIn && (
+                <div className="mt-8 space-y-3">
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href="/login">登录</Link>
+                  </Button>
+                  <Button variant="brand" className="w-full" asChild>
+                    <Link href="/register">免费注册</Link>
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

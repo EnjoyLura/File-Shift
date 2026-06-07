@@ -1,9 +1,35 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import type { ConversionTask, PaginatedData } from '@fileshift/shared-types';
-import { Header } from '@/components/layout/header';
+import {
+  History,
+  Download,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  FileCheck2,
+  Clock,
+  AlertCircle,
+  Loader2,
+  Inbox,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { EmptyState } from '@/components/shared/empty-state';
+import { PageTransition } from '@/components/shared/page-transition';
+import { useAuth } from '@/components/hooks/use-auth';
 import { getTaskList, authenticatedDownload, deleteTask } from '@/lib/api';
 
 const STATUS_OPTIONS = [
@@ -22,13 +48,16 @@ const TYPE_OPTIONS = [
   { value: 'media', label: '音视频' },
 ];
 
-const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  pending: { label: '等待中', className: 'text-muted-foreground' },
-  queued: { label: '排队中', className: 'text-yellow-600' },
-  processing: { label: '处理中', className: 'text-blue-600' },
-  completed: { label: '已完成', className: 'text-green-600' },
-  failed: { label: '失败', className: 'text-destructive' },
-  cancelled: { label: '已取消', className: 'text-muted-foreground' },
+const STATUS_BADGE: Record<
+  string,
+  { label: string; variant: 'success' | 'default' | 'warning' | 'destructive' | 'secondary' }
+> = {
+  pending: { label: '等待中', variant: 'secondary' },
+  queued: { label: '排队中', variant: 'warning' },
+  processing: { label: '处理中', variant: 'default' },
+  completed: { label: '已完成', variant: 'success' },
+  failed: { label: '失败', variant: 'destructive' },
+  cancelled: { label: '已取消', variant: 'secondary' },
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -67,9 +96,8 @@ const TYPE_LABELS: Record<string, string> = {
   'video-extract-audio': '提取音频',
 };
 
-export default function TasksPage() {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+export default function DesignTasksPage() {
+  const { isLoggedIn, loading: authLoading } = useAuth(true);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PaginatedData<ConversionTask> | null>(null);
   const [page, setPage] = useState(1);
@@ -77,15 +105,8 @@ export default function TasksPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [downloadingTaskNo, setDownloadingTaskNo] = useState<string | null>(null);
   const [deletingTaskNo, setDeletingTaskNo] = useState<string | null>(null);
-
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    setIsLoggedIn(true);
-  }, [router]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -99,7 +120,7 @@ export default function TasksPage() {
       );
       setData(result);
     } catch {
-      // ignore
+      /* ignore */
     } finally {
       setLoading(false);
     }
@@ -108,12 +129,6 @@ export default function TasksPage() {
   useEffect(() => {
     if (isLoggedIn) loadTasks();
   }, [isLoggedIn, loadTasks]);
-
-  const handleFilterChange = (filter: string, value: string) => {
-    if (filter === 'status') setStatusFilter(value);
-    if (filter === 'category') setCategoryFilter(value);
-    setPage(1);
-  };
 
   const handleDownload = async (taskNo: string, fileName?: string) => {
     try {
@@ -126,152 +141,198 @@ export default function TasksPage() {
     }
   };
 
-  const handleDelete = async (taskNo: string) => {
-    if (!confirm('确定要删除这条记录吗？')) return;
+  const confirmDelete = (taskNo: string) => {
+    setTaskToDelete(taskNo);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!taskToDelete) return;
     try {
-      setDeletingTaskNo(taskNo);
-      await deleteTask(taskNo);
+      setDeletingTaskNo(taskToDelete);
+      await deleteTask(taskToDelete);
       await loadTasks();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : '删除失败');
     } finally {
       setDeletingTaskNo(null);
+      setDeleteDialogOpen(false);
+      setTaskToDelete(null);
     }
   };
 
-  if (!isLoggedIn) return null;
+  if (authLoading || !isLoggedIn) return null;
+
+  const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0;
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        <h1 className="mb-6 text-2xl font-bold">转换历史</h1>
-
-        {/* 筛选栏 */}
-        <div className="mb-4 flex flex-wrap gap-3">
-          {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => handleFilterChange('status', opt.value)}
-              className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                statusFilter === opt.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'border hover:bg-accent'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-          <span className="mx-1 w-px bg-border" />
-          {TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => handleFilterChange('category', opt.value)}
-              className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                categoryFilter === opt.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'border hover:bg-accent'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+    <PageTransition>
+      <div className="mx-auto max-w-4xl px-4 py-8 md:py-12">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <History className="h-7 w-7 text-primary" /> 转换历史
+          </h1>
+          {data && <p className="mt-2 text-sm text-muted-foreground">共 {data.total} 条记录</p>}
         </div>
 
+        {/* Filters */}
+        <div className="mb-6 flex flex-wrap gap-3">
+          <Select
+            options={STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            className="w-32"
+          />
+          <Select
+            options={TYPE_OPTIONS}
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setPage(1);
+            }}
+            className="w-32"
+          />
+        </div>
+
+        {/* Loading Skeleton */}
         {loading ? (
-          <p className="py-12 text-center text-muted-foreground">加载中...</p>
-        ) : !data || data.list.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">
-            <p className="mb-2">暂无转换记录</p>
-            <p className="text-sm">
-              前往{' '}
-              <a href="/convert" className="text-primary hover:underline">
-                转换中心
-              </a>{' '}
-              开始使用
-            </p>
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i} className="p-4 flex items-center gap-4">
+                <Skeleton className="h-10 w-10 rounded-xl" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <Skeleton className="h-8 w-16" />
+              </Card>
+            ))}
           </div>
+        ) : !data || data.list.length === 0 ? (
+          <EmptyState
+            icon={Inbox}
+            title="暂无转换记录"
+            description="前往转换中心开始使用"
+            action={{ label: '去转换中心', onClick: () => (window.location.href = '/convert') }}
+          />
         ) : (
           <>
             <div className="space-y-3">
               {data.list.map((task) => {
-                const statusInfo = STATUS_LABELS[task.status] || STATUS_LABELS.pending;
+                const status = STATUS_BADGE[task.status] || STATUS_BADGE.pending;
                 const typeLabel = TYPE_LABELS[task.type] || task.type;
-
                 return (
-                  <div
-                    key={task.taskNo}
-                    className="flex items-center justify-between rounded-lg border p-4"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{typeLabel}</span>
-                        <span className={`text-xs ${statusInfo.className}`}>
-                          {statusInfo.label}
-                        </span>
+                  <Card key={task.taskNo} className="p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">{typeLabel}</span>
+                          <Badge variant={status.variant} className="text-[10px] px-1.5 py-0">
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {task.inputFileName}
+                          {task.outputFileName && ` → ${task.outputFileName}`}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {new Date(task.createdAt).toLocaleString('zh-CN')} · {task.creditsCost}{' '}
+                          积分
+                          {task.status === 'failed' && task.errorMessage && (
+                            <span className="ml-2 text-destructive">({task.errorMessage})</span>
+                          )}
+                        </p>
                       </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {task.inputFileName}
-                        {task.outputFileName && ` → ${task.outputFileName}`}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {new Date(task.createdAt).toLocaleString('zh-CN')} · {task.creditsCost} 积分
-                        {task.status === 'failed' && task.errorMessage && (
-                          <span className="ml-2 text-destructive">({task.errorMessage})</span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {task.status === 'completed' && (
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              handleDownload(task.taskNo, task.outputFileName || undefined)
+                            }
+                            disabled={downloadingTaskNo === task.taskNo}
+                          >
+                            {downloadingTaskNo === task.taskNo ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                            <span className="hidden sm:inline ml-1">下载</span>
+                          </Button>
                         )}
-                      </p>
-                    </div>
-
-                    <div className="ml-4 flex shrink-0 items-center gap-2">
-                      {task.status === 'completed' && (
-                        <button
-                          onClick={() =>
-                            handleDownload(task.taskNo, task.outputFileName || undefined)
-                          }
-                          disabled={downloadingTaskNo === task.taskNo}
-                          className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => confirmDelete(task.taskNo)}
+                          disabled={deletingTaskNo === task.taskNo}
+                          className="text-muted-foreground hover:text-destructive"
                         >
-                          {downloadingTaskNo === task.taskNo ? '下载中...' : '下载'}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(task.taskNo)}
-                        disabled={deletingTaskNo === task.taskNo}
-                        className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                      >
-                        删除
-                      </button>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
             </div>
 
-            {/* 分页 */}
-            {data.total > data.pageSize && (
-              <div className="mt-6 flex items-center justify-center gap-2">
-                <button
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
                 >
-                  上一页
-                </button>
+                  <ChevronLeft className="h-4 w-4" /> 上一页
+                </Button>
                 <span className="text-sm text-muted-foreground">
-                  {page} / {Math.ceil(data.total / data.pageSize)}
+                  {page} / {totalPages}
                 </span>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setPage((p) => p + 1)}
-                  disabled={page >= Math.ceil(data.total / data.pageSize)}
-                  className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+                  disabled={page >= totalPages}
                 >
-                  下一页
-                </button>
+                  下一页 <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             )}
           </>
         )}
-      </main>
-    </div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent onClose={() => setDeleteDialogOpen(false)}>
+            <DialogHeader>
+              <DialogTitle>确认删除</DialogTitle>
+              <DialogDescription>确定要删除这条转换记录吗？此操作不可撤销。</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                取消
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deletingTaskNo === taskToDelete}
+              >
+                {deletingTaskNo === taskToDelete ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                删除
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </PageTransition>
   );
 }
