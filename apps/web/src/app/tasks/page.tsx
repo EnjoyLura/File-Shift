@@ -82,6 +82,7 @@ export default function DesignTasksPage() {
   const { isLoggedIn, loading: authLoading } = useAuth(true);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PaginatedData<ConversionTask> | null>(null);
+  const [categoryLimits, setCategoryLimits] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [downloadingTaskNo, setDownloadingTaskNo] = useState<string | null>(null);
@@ -94,6 +95,10 @@ export default function DesignTasksPage() {
       setLoading(true);
       const result = await getTaskList(page, 20, undefined, undefined, categoryFilter || undefined);
       setData(result);
+      // API 返回的 categoryLimits
+      if ((result as any).categoryLimits) {
+        setCategoryLimits((result as any).categoryLimits);
+      }
     } catch {
       /* ignore */
     } finally {
@@ -171,6 +176,13 @@ export default function DesignTasksPage() {
             </button>
           ))}
         </div>
+
+        {/* Category Limits Hint */}
+        {Object.keys(categoryLimits).length > 0 && (
+          <p className="mb-4 text-xs text-muted-foreground">
+            {`历史上限：图片 ${categoryLimits.image} 条，文档 ${categoryLimits.document} 条，PDF ${categoryLimits.tool} 条，音视频 ${categoryLimits.media} 条（超出自动删除最旧记录）`}
+          </p>
+        )}
 
         {/* Loading Skeleton */}
         {loading ? (

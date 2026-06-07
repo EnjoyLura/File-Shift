@@ -108,7 +108,11 @@ export class DocumentStrategy implements ConversionStrategy {
     ].join(' ');
 
     this.logger.log(`执行 LibreOffice 转换: ${conversionType}`);
-    await execAsync(cmd, { timeout: LO_TIMEOUT_MS });
+    const { stderr } = await execAsync(cmd, {
+      timeout: LO_TIMEOUT_MS,
+      env: { ...process.env, HOME: '/tmp' },
+    });
+    if (stderr) this.logger.warn(`LibreOffice stderr: ${stderr.trim()}`);
 
     // LibreOffice 输出文件名基于输入文件名
     const inputBaseName = path.basename(inputPath, path.extname(inputPath));
@@ -158,7 +162,11 @@ export class DocumentStrategy implements ConversionStrategy {
     ].join(' ');
 
     this.logger.log(`执行 LibreOffice 转换: ${conversionType}`);
-    await execAsync(cmd, { timeout: LO_TIMEOUT_MS });
+    const { stderr } = await execAsync(cmd, {
+      timeout: LO_TIMEOUT_MS,
+      env: { ...process.env, HOME: '/tmp' },
+    });
+    if (stderr) this.logger.warn(`LibreOffice stderr: ${stderr.trim()}`);
 
     // LibreOffice 输出文件名基于输入文件名
     const inputBaseName = path.basename(inputPath, path.extname(inputPath));

@@ -208,6 +208,17 @@ export class ConversionController {
     @Query('type') type?: string,
     @Query('category') category?: string,
   ) {
-    return this.conversionService.getTaskList(userId, page, pageSize, status, type, category);
+    const result = await this.conversionService.getTaskList(
+      userId,
+      page,
+      pageSize,
+      status,
+      type,
+      category,
+    );
+    return {
+      ...result,
+      categoryLimits: this.conversionService.getCategoryLimits(),
+    };
   }
 }

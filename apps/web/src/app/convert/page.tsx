@@ -218,7 +218,7 @@ export default function DesignConvertPage() {
                       <motion.div key={tool.type} variants={fadeUp}>
                         <Link
                           href={`/convert/${tool.type}`}
-                          className="group block rounded-xl border border-border bg-background p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30"
+                          className="group block rounded-xl border border-border bg-background p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30"
                         >
                           <p className="font-medium text-sm group-hover:text-primary transition-colors">
                             {tool.label}

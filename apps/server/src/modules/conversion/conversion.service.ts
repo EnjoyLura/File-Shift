@@ -71,6 +71,15 @@ const ESTIMATED_TIME: Record<string, number> = {
   tool: 15,
 };
 
+/** 每个用户每种类型的历史上限 */
+const CATEGORY_LIMITS: Record<string, number> = {
+  image: 20,
+  document: 5,
+  media: 5,
+  tool: 5,
+  compress: 5,
+};
+
 @Injectable()
 export class ConversionService {
   private readonly logger = new Logger(ConversionService.name);
@@ -200,6 +209,9 @@ export class ConversionService {
 
     this.logger.log(`转换任务已创建: ${saved.taskNo} (${conversionType})`);
 
+    // 自动清理超出上限的旧任务
+    await this.enforceCategoryLimit(userId, category);
+
     return {
       taskNo: saved.taskNo,
       status: saved.status,
@@ -313,6 +325,37 @@ export class ConversionService {
       fileCount: uploadedFiles.length,
       createdAt: saved.createdAt.toISOString(),
     };
+  }
+
+  /**
+   * 强制执行每个用户的分类历史上限，自动删除最旧的超出记录
+   */
+  private async enforceCategoryLimit(userId: number, category: string): Promise<void> {
+    const limit = CATEGORY_LIMITS[category];
+    if (!limit) return;
+
+    const cat = category as TaskCategory;
+    const count = await this.taskRepo.count({ where: { userId, category: cat } });
+    if (count <= limit) return;
+
+    const excess = count - limit;
+    const oldest = await this.taskRepo.find({
+      where: { userId, category: cat },
+      order: { createdAt: 'ASC' },
+      take: excess,
+    });
+
+    for (const task of oldest) {
+      await this.taskRepo.softDelete(task.id);
+    }
+    this.logger.log(`自动清理用户 ${userId} 的 ${excess} 条旧 ${category} 任务`);
+  }
+
+  /**
+   * 获取每个分类的历史上限
+   */
+  getCategoryLimits(): Record<string, number> {
+    return { ...CATEGORY_LIMITS };
   }
 
   /**

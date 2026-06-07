@@ -150,15 +150,20 @@ export class MediaStrategy implements ConversionStrategy {
         const bitrate = (options?.bitrate as string) || '192k';
         cmd.audioBitrate(bitrate);
       } else {
-        // 视频格式
+        // 视频格式 - 使用高质量默认参数
         const targetFormat = formatInfo.ext.slice(1);
         cmd.format(targetFormat);
 
         if (options?.videoBitrate) {
           cmd.videoBitrate(options.videoBitrate as string);
+        } else {
+          // 保持高画质: 使用 CRF 模式 (质量恒定)
+          cmd.outputOptions(['-q:v 2']);
         }
         if (options?.audioBitrate) {
           cmd.audioBitrate(options.audioBitrate as string);
+        } else {
+          cmd.audioBitrate('192k');
         }
       }
 
