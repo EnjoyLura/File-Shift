@@ -1,4 +1,4 @@
-import type { UserCredits } from './user.types';
+import type { UserRole, UserStatus } from './user.types';
 
 /** 注册请求 */
 export interface RegisterRequest {
@@ -44,10 +44,14 @@ export interface UserProfileResponse {
   phone: string | null;
   nickname: string | null;
   avatarUrl: string | null;
-  role: 'user' | 'admin';
+  role: UserRole;
+  status: UserStatus;
   inviteCode: string;
+  inviteCount: number;
   createdAt: string;
-  credits?: UserCredits;
+  credits: number;
+  totalCreditsEarned: number;
+  totalCreditsSpent: number;
 }
 
 /** 修改密码请求 */

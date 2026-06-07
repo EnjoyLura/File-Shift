@@ -21,6 +21,11 @@ export class UserService {
       throw new NotFoundException('用户不存在');
     }
 
+    // 统计被我邀请的人数
+    const inviteCount = await this.userRepo.count({
+      where: { invitedBy: userId },
+    });
+
     return {
       id: Number(user.id),
       email: user.email,
@@ -28,13 +33,13 @@ export class UserService {
       nickname: user.nickname,
       avatarUrl: user.avatarUrl,
       role: user.role,
+      status: user.status,
       inviteCode: user.inviteCode,
+      inviteCount,
       createdAt: user.createdAt.toISOString(),
-      credits: {
-        balance: user.creditsBalance || 0,
-        totalEarned: user.creditsTotalEarned || 0,
-        totalSpent: user.creditsTotalSpent || 0,
-      },
+      credits: user.creditsBalance || 0,
+      totalCreditsEarned: user.creditsTotalEarned || 0,
+      totalCreditsSpent: user.creditsTotalSpent || 0,
     };
   }
 
@@ -54,6 +59,11 @@ export class UserService {
 
     await this.userRepo.save(user);
 
+    // 统计被我邀请的人数
+    const inviteCount = await this.userRepo.count({
+      where: { invitedBy: userId },
+    });
+
     return {
       id: Number(user.id),
       email: user.email,
@@ -61,13 +71,13 @@ export class UserService {
       nickname: user.nickname,
       avatarUrl: user.avatarUrl,
       role: user.role,
+      status: user.status,
       inviteCode: user.inviteCode,
+      inviteCount,
       createdAt: user.createdAt.toISOString(),
-      credits: {
-        balance: user.creditsBalance || 0,
-        totalEarned: user.creditsTotalEarned || 0,
-        totalSpent: user.creditsTotalSpent || 0,
-      },
+      credits: user.creditsBalance || 0,
+      totalCreditsEarned: user.creditsTotalEarned || 0,
+      totalCreditsSpent: user.creditsTotalSpent || 0,
     };
   }
 
